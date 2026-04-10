@@ -153,7 +153,7 @@ struct MainWindowView: View {
             Divider().opacity(0.5)
             HStack(spacing: 8) {
                 Image(systemName: "circle.fill")
-                    .font(.system(size: 10))
+                    .font(.system(size: 7))
                     .foregroundColor(accentOrange)
                 Text("NativeLearn")
                     .font(.system(size: 12, weight: .medium))
@@ -249,7 +249,7 @@ struct MainWindowView: View {
                 Spacer()
                 VStack(spacing: 16) {
                     Image(systemName: "circle.fill")
-                        .font(.system(size: 36))
+                        .font(.system(size: 24))
                         .foregroundColor(subtleText.opacity(0.3))
                     Text("No conversations yet")
                         .font(.system(size: 17, weight: .medium))
@@ -531,7 +531,7 @@ struct ConversationDetailView: View {
                     HStack(alignment: .top, spacing: 12) {
                         Circle()
                             .fill(accentOrange)
-                            .frame(width: 28, height: 28)
+                            .frame(width: 20, height: 20)
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Nate")

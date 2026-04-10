@@ -300,7 +300,7 @@ struct BlueCursorView: View {
             // them (which caused a visible cursor "pop").
             Circle()
                 .fill(DS.Colors.overlayCursorBlue)
-                .frame(width: 12, height: 12)
+                .frame(width: 8, height: 8)
                 .shadow(color: DS.Colors.overlayCursorBlue, radius: 8 + (buddyFlightScale - 1.0) * 20, x: 0, y: 0)
                 .scaleEffect(buddyFlightScale)
                 .opacity(buddyIsVisibleOnThisScreen && (companionManager.voiceState == .idle || companionManager.voiceState == .responding) ? cursorOpacity : 0)
