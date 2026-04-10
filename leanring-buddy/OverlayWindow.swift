@@ -120,7 +120,7 @@ struct BlueCursorView: View {
         let mouseLocation = NSEvent.mouseLocation
         let localX = mouseLocation.x - screenFrame.origin.x
         let localY = screenFrame.height - (mouseLocation.y - screenFrame.origin.y)
-        _cursorPosition = State(initialValue: CGPoint(x: localX + 35, y: localY + 25))
+        _cursorPosition = State(initialValue: CGPoint(x: localX + 18, y: localY + 18))
         _isCursorOnThisScreen = State(initialValue: screenFrame.contains(mouseLocation))
     }
     @State private var timer: Timer?
@@ -301,9 +301,9 @@ struct BlueCursorView: View {
             Circle()
                 .fill(DS.Colors.overlayCursorBlue)
                 .frame(width: 8, height: 8)
-                .shadow(color: DS.Colors.overlayCursorBlue, radius: 8 + (buddyFlightScale - 1.0) * 20, x: 0, y: 0)
+                .shadow(color: DS.Colors.overlayCursorBlue, radius: 3 + (buddyFlightScale - 1.0) * 10, x: 0, y: 0)
                 .scaleEffect(buddyFlightScale)
-                .opacity(buddyIsVisibleOnThisScreen && (companionManager.voiceState == .idle || companionManager.voiceState == .responding) ? cursorOpacity : 0)
+                .opacity(buddyIsVisibleOnThisScreen && !showWelcome && (companionManager.voiceState == .idle || companionManager.voiceState == .responding) ? cursorOpacity : 0)
                 .position(cursorPosition)
                 .animation(
                     buddyNavigationMode == .followingCursor
@@ -336,7 +336,7 @@ struct BlueCursorView: View {
             isCursorOnThisScreen = screenFrame.contains(mouseLocation)
 
             let swiftUIPosition = convertScreenPointToSwiftUICoordinates(mouseLocation)
-            self.cursorPosition = CGPoint(x: swiftUIPosition.x + 35, y: swiftUIPosition.y + 25)
+            self.cursorPosition = CGPoint(x: swiftUIPosition.x + 18, y: swiftUIPosition.y + 18)
 
             startTrackingCursor()
 
@@ -427,8 +427,8 @@ struct BlueCursorView: View {
 
             // Normal cursor following
             let swiftUIPosition = self.convertScreenPointToSwiftUICoordinates(mouseLocation)
-            let buddyX = swiftUIPosition.x + 35
-            let buddyY = swiftUIPosition.y + 25
+            let buddyX = swiftUIPosition.x + 18
+            let buddyY = swiftUIPosition.y + 18
             self.cursorPosition = CGPoint(x: buddyX, y: buddyY)
         }
     }
@@ -626,7 +626,7 @@ struct BlueCursorView: View {
     private func startFlyingBackToCursor() {
         let mouseLocation = NSEvent.mouseLocation
         let cursorInSwiftUI = convertScreenPointToSwiftUICoordinates(mouseLocation)
-        let cursorWithTrackingOffset = CGPoint(x: cursorInSwiftUI.x + 35, y: cursorInSwiftUI.y + 25)
+        let cursorWithTrackingOffset = CGPoint(x: cursorInSwiftUI.x + 18, y: cursorInSwiftUI.y + 18)
 
         cursorPositionWhenNavigationStarted = cursorInSwiftUI
 
@@ -700,17 +700,17 @@ struct BlueCursorView: View {
 private struct BlueCursorWaveformView: View {
     let audioPowerLevel: CGFloat
 
-    private let barCount = 5
-    private let listeningBarProfile: [CGFloat] = [0.4, 0.7, 1.0, 0.7, 0.4]
+    private let barCount = 3
+    private let listeningBarProfile: [CGFloat] = [0.6, 1.0, 0.6]
 
     var body: some View {
         TimelineView(.animation(minimumInterval: 1.0 / 36.0)) { timelineContext in
-            HStack(alignment: .center, spacing: 2) {
+            HStack(alignment: .center, spacing: 1.5) {
                 ForEach(0..<barCount, id: \.self) { barIndex in
-                    RoundedRectangle(cornerRadius: 1.5, style: .continuous)
+                    RoundedRectangle(cornerRadius: 1, style: .continuous)
                         .fill(DS.Colors.overlayCursorBlue)
                         .frame(
-                            width: 2,
+                            width: 1.5,
                             height: barHeight(
                                 for: barIndex,
                                 timelineDate: timelineContext.date
@@ -718,7 +718,7 @@ private struct BlueCursorWaveformView: View {
                         )
                 }
             }
-            .shadow(color: DS.Colors.overlayCursorBlue.opacity(0.6), radius: 6, x: 0, y: 0)
+            .shadow(color: DS.Colors.overlayCursorBlue.opacity(0.4), radius: 3, x: 0, y: 0)
             .animation(.linear(duration: 0.08), value: audioPowerLevel)
         }
     }
@@ -727,9 +727,9 @@ private struct BlueCursorWaveformView: View {
         let animationPhase = CGFloat(timelineDate.timeIntervalSinceReferenceDate * 3.6) + CGFloat(barIndex) * 0.35
         let normalizedAudioPowerLevel = max(audioPowerLevel - 0.008, 0)
         let easedAudioPowerLevel = pow(min(normalizedAudioPowerLevel * 2.85, 1), 0.76)
-        let reactiveHeight = easedAudioPowerLevel * 10 * listeningBarProfile[barIndex]
-        let idlePulse = (sin(animationPhase) + 1) / 2 * 1.5
-        return 3 + reactiveHeight + idlePulse
+        let reactiveHeight = easedAudioPowerLevel * 6 * listeningBarProfile[barIndex]
+        let idlePulse = (sin(animationPhase) + 1) / 2 * 1.0
+        return 2 + reactiveHeight + idlePulse
     }
 }
 
@@ -751,11 +751,11 @@ private struct BlueCursorSpinnerView: View {
                     ],
                     center: .center
                 ),
-                style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
+                style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
             )
-            .frame(width: 14, height: 14)
+            .frame(width: 8, height: 8)
             .rotationEffect(.degrees(isSpinning ? 360 : 0))
-            .shadow(color: DS.Colors.overlayCursorBlue.opacity(0.6), radius: 6, x: 0, y: 0)
+            .shadow(color: DS.Colors.overlayCursorBlue.opacity(0.4), radius: 3, x: 0, y: 0)
             .onAppear {
                 withAnimation(.linear(duration: 0.8).repeatForever(autoreverses: false)) {
                     isSpinning = true
@@ -779,23 +779,26 @@ class OverlayWindowManager {
         let isFirstAppearance = !hasShownOverlayBefore
         hasShownOverlayBefore = true
 
-        // Create one overlay window per screen
-        for screen in screens {
-            let window = OverlayWindow(screen: screen)
+        // Only create an overlay on the screen the cursor is currently on.
+        // This avoids duplicate icons when multiple displays are connected.
+        let mouseLocation = NSEvent.mouseLocation
+        let activeScreen = screens.first(where: { $0.frame.contains(mouseLocation) }) ?? screens.first
+        guard let screen = activeScreen else { return }
 
-            let contentView = BlueCursorView(
-                screenFrame: screen.frame,
-                isFirstAppearance: isFirstAppearance,
-                companionManager: companionManager
-            )
+        let window = OverlayWindow(screen: screen)
 
-            let hostingView = NSHostingView(rootView: contentView)
-            hostingView.frame = screen.frame
-            window.contentView = hostingView
+        let contentView = BlueCursorView(
+            screenFrame: screen.frame,
+            isFirstAppearance: isFirstAppearance,
+            companionManager: companionManager
+        )
 
-            overlayWindows.append(window)
-            window.orderFrontRegardless()
-        }
+        let hostingView = NSHostingView(rootView: contentView)
+        hostingView.frame = screen.frame
+        window.contentView = hostingView
+
+        overlayWindows.append(window)
+        window.orderFrontRegardless()
     }
 
     func hideOverlay() {
