@@ -5,13 +5,13 @@
 
 ## Overview
 
-Vibecademy is a macOS AI tutor that helps users become AI-native. It places a companion cursor called **Nate** (a small orange circle) next to the user's mouse pointer. Nate can see the user's screen, respond to voice commands, and walk them through how to use AI tools like Replit, Cursor, Claude Code, and Codex — step by step, conversationally.
+Vibecademy is a macOS AI tutor that helps users become AI-native. It places a companion cursor called **Sparkle** (an orange sparkle shape) next to the user's mouse pointer. Sparkle can see the user's screen, respond to voice commands, and walk them through how to use AI tools like Replit, Cursor, Claude Code, and Codex — step by step, conversationally.
 
 The app has two main surfaces:
-1. **Desktop window** — A full-size window with sidebar navigation, conversation history, and a Nate on/off toggle. This is what the user sees on launch.
-2. **Cursor overlay** — A transparent full-screen overlay hosting Nate's circle icon, which follows the user's mouse and can fly to and point at UI elements.
+1. **Desktop window** — A full-size window with sidebar navigation, conversation history, and a Sparkle on/off toggle. This is what the user sees on launch.
+2. **Cursor overlay** — A transparent full-screen overlay hosting Sparkle's sparkle icon, which follows the user's mouse and can fly to and point at UI elements.
 
-Push-to-talk (Control+Option) captures voice, transcribes it, sends it with a screenshot to Claude, and Nate responds with voice (ElevenLabs TTS) while pointing at relevant screen elements.
+Push-to-talk (Control+Option) captures voice, transcribes it, sends it with a screenshot to Claude, and Sparkle responds with voice (ElevenLabs TTS) while pointing at relevant screen elements.
 
 All API keys live on a Cloudflare Worker proxy — nothing sensitive ships in the app binary.
 
@@ -19,17 +19,17 @@ All API keys live on a Cloudflare Worker proxy — nothing sensitive ships in th
 
 Built on top of [Clicky](https://github.com/farzaa/clicky) by Farza. Major changes from the original:
 
-- Rebranded from "Clicky" to "Vibecademy" with AI tutor persona "Nate"
+- Rebranded from "Clicky" to "Vibecademy" with AI tutor persona "Sparkle"
 - Changed companion icon from blue triangle to orange sparkle
 - Changed from menu-bar-only app to full desktop app with main window (`LSUIElement=false`)
 - Added persistent conversation storage (JSON files in Application Support)
 - Added desktop window with sidebar navigation (Home, Chat, Spaces) and conversation history
-- Added Nate on/off toggle — Nate is off by default, user activates from the desktop app
-- Changed TTS voice from female to male (ElevenLabs "Adam" voice: `pNInz6obpgDQGcFmaJgB`)
+- Added Sparkle on/off toggle — Sparkle is off by default, user activates from the desktop app
+- Changed TTS voice to young British female (ElevenLabs "Charlotte" voice: `XB0fDUnXU5powFXDhCwa`)
 - Removed Sparkle auto-update framework
 - Removed onboarding video, replaced with text-based instructions
 - Made menu bar panel draggable
-- Updated system prompts for Nate's AI tutor persona
+- Updated system prompts for Sparkle's AI tutor persona
 
 ## Architecture
 
@@ -38,7 +38,7 @@ Built on top of [Clicky](https://github.com/farzaa/clicky) by Farza. Major chang
 - **Pattern**: MVVM with `@StateObject` / `@ObservedObject` / `@Published` state management
 - **AI Chat**: Claude (Sonnet 4.6 default, Opus 4.6 optional) via Cloudflare Worker proxy with SSE streaming
 - **Speech-to-Text**: AssemblyAI real-time streaming (`u3-rt-pro` model) via websocket, with OpenAI and Apple Speech as fallbacks
-- **Text-to-Speech**: ElevenLabs (`eleven_flash_v2_5` model, male "Adam" voice) via Cloudflare Worker proxy
+- **Text-to-Speech**: ElevenLabs (`eleven_flash_v2_5` model, female "Charlotte" voice) via Cloudflare Worker proxy
 - **Screen Capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
 - **Voice Input**: Push-to-talk (Control+Option) via `AVAudioEngine` + pluggable transcription-provider layer. System-wide keyboard shortcut via listen-only CGEvent tap.
 - **Companion Icon**: Orange sparkle (`sparkle` SF Symbol) — used in cursor overlay, menu bar, and transcript UI
@@ -58,15 +58,15 @@ The app never calls external APIs directly. All requests go through a Cloudflare
 | `POST /transcribe-token` | `streaming.assemblyai.com/v3/token` | Fetches a short-lived (480s) AssemblyAI websocket token |
 
 Worker secrets: `ANTHROPIC_API_KEY`, `ASSEMBLYAI_API_KEY`, `ELEVENLABS_API_KEY`
-Worker vars: `ELEVENLABS_VOICE_ID` (set to `pNInz6obpgDQGcFmaJgB` — Adam male voice)
+Worker vars: `ELEVENLABS_VOICE_ID` (set to `XB0fDUnXU5powFXDhCwa` — Charlotte female voice)
 
 ### Key Architecture Decisions
 
 **Desktop Window + Menu Bar**: The app launches with a full `WindowGroup` containing `MainWindowView` (sidebar + detail). The menu bar status item with circle icon remains as a secondary access point. `LSUIElement` is `true` and the app switches to `.regular` activation policy after overlay setup.
 
-**Nate Toggle**: `CompanionManager.isNateCursorEnabled` controls whether the cursor overlay is visible. Defaults to `false` — the desktop app shows first, and the user activates Nate via a toggle in the sidebar or a hero card on the Home view. The preference is persisted to `UserDefaults`. Even when Nate is off, pressing Control+Option temporarily brings the overlay back for that interaction (transient cursor mode).
+**Sparkle Toggle**: `CompanionManager.isSparkleCursorEnabled` controls whether the cursor overlay is visible. Defaults to `false` — the desktop app shows first, and the user activates Sparkle via a toggle in the sidebar or a hero card on the Home view. The preference is persisted to `UserDefaults`. Even when Sparkle is off, pressing Control+Option temporarily brings the overlay back for that interaction (transient cursor mode).
 
-**Conversation Storage**: `ConversationStore` saves conversations as JSON to `~/Library/Application Support/Vibecademy/`. Each voice interaction (user transcript + Nate response) is appended to the active conversation. Conversations have titles (auto-generated from the first user message), summaries, and can be organized into Spaces (folders). The store is injected into both `MainWindowView` and `CompanionManager` from the app delegate.
+**Conversation Storage**: `ConversationStore` saves conversations as JSON to `~/Library/Application Support/Vibecademy/`. Each voice interaction (user transcript + Sparkle response) is appended to the active conversation. Conversations have titles (auto-generated from the first user message), summaries, and can be organized into Spaces (folders). The store is injected into both `MainWindowView` and `CompanionManager` from the app delegate.
 
 **Menu Bar Panel Pattern**: The companion panel uses `NSStatusItem` for the menu bar icon and a custom borderless `NSPanel` for the floating control panel. The panel is non-activating so it doesn't steal focus. A global event monitor auto-dismisses it on outside clicks. The panel is draggable (`isMovableByWindowBackground = true`).
 
@@ -81,8 +81,8 @@ Worker vars: `ELEVENLABS_VOICE_ID` (set to `pNInz6obpgDQGcFmaJgB` — Adam male 
 | File | Lines | Purpose |
 |------|-------|---------|
 | `leanring_buddyApp.swift` | ~70 | App entry point. `WindowGroup` displays `MainWindowView`. `CompanionAppDelegate` creates `CompanionManager`, `ConversationStore`, and `MenuBarPanelManager`, then starts the companion pipeline on launch. |
-| `CompanionManager.swift` | ~992 | Central state machine. Owns dictation, shortcut monitoring, screen capture, Claude API, ElevenLabs TTS, overlay management, and Nate on/off toggle (`isNateCursorEnabled`). Coordinates the full push-to-talk → screenshot → Claude → TTS → pointing pipeline. Auto-saves voice exchanges to `ConversationStore`. |
-| `MainWindowView.swift` | ~544 | Primary desktop window UI. `NavigationSplitView` with sidebar (search, Home, Chat, Spaces) and detail pane (conversation list grouped by date, or conversation detail view). Includes Nate on/off toggle in sidebar footer and a hero card on the Home view when Nate is off. |
+| `CompanionManager.swift` | ~992 | Central state machine. Owns dictation, shortcut monitoring, screen capture, Claude API, ElevenLabs TTS, overlay management, and Sparkle on/off toggle (`isSparkleCursorEnabled`). Coordinates the full push-to-talk → screenshot → Claude → TTS → pointing pipeline. Auto-saves voice exchanges to `ConversationStore`. |
+| `MainWindowView.swift` | ~859 | Primary desktop window UI. Granola-style layout with sidebar (search, Home, Chat, Spaces) and detail pane (conversation list grouped by date, or conversation detail view). Sidebar footer has icon toolbar (Sparkle toggle, model picker, settings), status row, and brand row. Hero card at top of Home view adapts to Sparkle state (setup needed, Meet Sparkle activation, or push-to-talk instructions). |
 | `ConversationStore.swift` | ~248 | Persistent conversation storage. Data models: `ConversationExchange`, `Conversation`, `Space`. Saves/loads JSON in `~/Library/Application Support/Vibecademy/`. Groups conversations by date. Supports Spaces (folders) for organizing conversations. |
 | `MenuBarPanelManager.swift` | ~243 | NSStatusItem + custom NSPanel lifecycle. Creates the circle menu bar icon, manages the floating companion panel (show/hide/position), installs click-outside-to-dismiss monitor. Panel is draggable. |
 | `CompanionPanelView.swift` | ~761 | SwiftUI panel content for the menu bar dropdown. Shows companion status, push-to-talk instructions, model picker (Sonnet/Opus), permissions UI, DM feedback button, and quit button. Dark aesthetic using `DS` design system. |

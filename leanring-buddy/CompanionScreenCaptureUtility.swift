@@ -37,11 +37,15 @@ enum CompanionScreenCaptureUtility {
 
         let mouseLocation = NSEvent.mouseLocation
 
-        // Exclude all windows belonging to this app so the AI sees
-        // only the user's content, not our overlays or panels.
+        // Exclude overlay and panel windows belonging to this app so the AI
+        // doesn't see the Sparkle cursor overlay or the menu bar panel, but CAN
+        // see the main desktop window. Overlays and panels have a non-zero
+        // windowLayer (e.g. .screenSaver = ~1000, .floating = ~3), while the
+        // main app window sits at the normal window layer (0).
         let ownBundleIdentifier = Bundle.main.bundleIdentifier
         let ownAppWindows = content.windows.filter { window in
             window.owningApplication?.bundleIdentifier == ownBundleIdentifier
+            && window.windowLayer > 0
         }
 
         // Build a lookup from display ID to NSScreen so we can use AppKit-coordinate

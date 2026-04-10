@@ -547,10 +547,17 @@ final class BuddyDictationManager: NSObject, ObservableObject {
         print("🎙️ BuddyDictationManager: provider ready, starting audio engine")
 
         let inputNode = audioEngine.inputNode
-        let inputFormat = inputNode.outputFormat(forBus: 0)
+
+        // Use the hardware input format (inputFormat) rather than the node's
+        // output format (outputFormat) or nil. outputFormat and nil both resolve
+        // to the node's processing format, which can differ from the actual
+        // hardware sample rate (e.g. hardware at 24kHz vs node output at 48kHz),
+        // causing a "formats don't match" error (-10868) on engine.start().
+        // BuddyPCM16AudioConverter handles converting any rate to 16kHz PCM16.
+        let hardwareInputFormat = inputNode.inputFormat(forBus: 0)
 
         inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: inputFormat) { [weak self] buffer, _ in
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: hardwareInputFormat) { [weak self] buffer, _ in
             self?.activeTranscriptionSession?.appendAudioBuffer(buffer)
             self?.updateAudioPowerLevel(from: buffer)
         }

@@ -15,6 +15,8 @@ private let sidebarSelected = Color(red: 0.93, green: 0.91, blue: 0.88)
 private let sidebarHover = Color(red: 0.94, green: 0.93, blue: 0.90)
 private let subtleText = Color(red: 0.55, green: 0.53, blue: 0.50)
 private let accentOrange = Color(red: 0.95, green: 0.55, blue: 0.20)
+private let cardBorder = Color(red: 0.88, green: 0.86, blue: 0.83)
+private let rowSeparator = Color(red: 0.91, green: 0.89, blue: 0.86)
 
 struct MainWindowView: View {
     @ObservedObject var conversationStore: ConversationStore
@@ -25,6 +27,7 @@ struct MainWindowView: View {
     @State private var isCreatingSpace = false
     @State private var newSpaceName = ""
     @State private var hoveredSidebarItem: SidebarItem?
+    @State private var hoveredFooterIcon: String?
 
     enum SidebarItem: Hashable {
         case home
@@ -150,24 +153,158 @@ struct MainWindowView: View {
             Spacer()
 
             // Footer
-            Divider().opacity(0.5)
-            HStack(spacing: 8) {
-                SparkleShape()
-                    .fill(accentOrange)
-                    .frame(width: 10, height: 10)
-                Text("Vibecademy")
-                    .font(.system(size: 12, weight: .medium))
-                    .foregroundColor(subtleText)
-                Spacer()
-                Circle()
-                    .fill(companionManager.allPermissionsGranted ? Color.green.opacity(0.8) : Color.orange.opacity(0.8))
-                    .frame(width: 7, height: 7)
-            }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            sidebarFooter
         }
         .background(sidebarBackground)
     }
+
+    // MARK: - Sidebar Footer
+
+    private var sidebarFooter: some View {
+        VStack(spacing: 0) {
+            Divider().opacity(0.5)
+
+            // Icon toolbar row
+            HStack(spacing: 4) {
+                sidebarFooterIconButton(
+                    icon: companionManager.isSparkleCursorEnabled ? "sparkle" : "sparkle",
+                    identifier: "sparkle",
+                    isActive: companionManager.isSparkleCursorEnabled
+                ) {
+                    companionManager.setSparkleCursorEnabled(!companionManager.isSparkleCursorEnabled)
+                }
+
+                sidebarFooterIconButton(
+                    icon: "cpu",
+                    identifier: "model",
+                    isActive: false
+                ) {
+                    let nextModel = companionManager.selectedModel == "claude-sonnet-4-6"
+                        ? "claude-opus-4-6"
+                        : "claude-sonnet-4-6"
+                    companionManager.setSelectedModel(nextModel)
+                }
+
+                Spacer()
+
+                sidebarFooterIconButton(
+                    icon: "gearshape",
+                    identifier: "settings",
+                    isActive: false
+                ) {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
+                        NSWorkspace.shared.open(url)
+                    }
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.top, 10)
+            .padding(.bottom, 6)
+
+            // Status row
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(sparkleStatusColor)
+                    .frame(width: 7, height: 7)
+                Text(sparkleStatusLabel)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(subtleText)
+
+                Spacer()
+
+                Text(modelShortLabel)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundColor(subtleText.opacity(0.6))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .fill(warmBackground)
+                    )
+            }
+            .padding(.horizontal, 14)
+            .padding(.bottom, 8)
+
+            Divider().opacity(0.3)
+
+            // Brand row (workspace selector style)
+            HStack(spacing: 8) {
+                SparkleShape()
+                    .fill(accentOrange)
+                    .frame(width: 12, height: 12)
+                Text("Vibecademy")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(.primary.opacity(0.7))
+                Spacer()
+                Text(appVersionLabel)
+                    .font(.system(size: 10, weight: .medium, design: .rounded))
+                    .foregroundColor(subtleText.opacity(0.5))
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+        }
+    }
+
+    private func sidebarFooterIconButton(
+        icon: String,
+        identifier: String,
+        isActive: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        let isHovered = hoveredFooterIcon == identifier
+
+        return Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(isActive ? accentOrange : subtleText.opacity(isHovered ? 0.9 : 0.6))
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(isHovered ? warmBackground : Color.clear)
+                )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            hoveredFooterIcon = hovering ? identifier : nil
+            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
+
+    private var sparkleStatusColor: Color {
+        if !companionManager.allPermissionsGranted {
+            return Color.orange.opacity(0.8)
+        }
+        if companionManager.isSparkleCursorEnabled {
+            return Color.green.opacity(0.8)
+        }
+        return subtleText.opacity(0.4)
+    }
+
+    private var sparkleStatusLabel: String {
+        if !companionManager.allPermissionsGranted {
+            return "Setup needed"
+        }
+        if companionManager.isSparkleCursorEnabled {
+            switch companionManager.voiceState {
+            case .idle: return "Sparkle active"
+            case .listening: return "Listening..."
+            case .processing: return "Processing..."
+            case .responding: return "Responding..."
+            }
+        }
+        return "Sparkle off"
+    }
+
+    private var modelShortLabel: String {
+        companionManager.selectedModel == "claude-opus-4-6" ? "Opus" : "Sonnet"
+    }
+
+    private var appVersionLabel: String {
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        return "v\(version)"
+    }
+
+    // MARK: - Sidebar Row
 
     private func sidebarRow(item: SidebarItem, icon: String, label: String) -> some View {
         let isSelected = sidebarSelection == item
@@ -245,56 +382,191 @@ struct MainWindowView: View {
             }
             .frame(height: 52)
 
-            if filteredGroups.isEmpty {
-                Spacer()
-                VStack(spacing: 16) {
-                    SparkleShape()
-                        .fill(subtleText.opacity(0.3))
-                        .frame(width: 32, height: 32)
-                    Text("No conversations yet")
-                        .font(.system(size: 17, weight: .medium))
-                        .foregroundColor(subtleText)
-                    Text("Hold  Control + Option  to talk to Nate")
-                        .font(.system(size: 13))
-                        .foregroundColor(subtleText.opacity(0.6))
-                }
-                Spacer()
-            } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 0) {
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    // Hero card
+                    heroCard
+                        .padding(.horizontal, 20)
+                        .padding(.bottom, 8)
+
+                    if filteredGroups.isEmpty {
+                        emptyStateView
+                            .padding(.top, 48)
+                    } else {
                         ForEach(filteredGroups, id: \.0) { label, convos in
                             dateSectionHeader(label)
 
-                            ForEach(convos) { conversation in
-                                ConversationRowView(conversation: conversation)
-                                    .contentShape(Rectangle())
-                                    .onTapGesture {
-                                        selectedConversationId = conversation.id
-                                    }
-                                    .contextMenu {
-                                        Menu("Move to Space") {
-                                            Button("None") {
-                                                conversationStore.moveConversation(conversation.id, toSpace: nil)
-                                            }
-                                            ForEach(conversationStore.spaces) { space in
-                                                Button(space.name) {
-                                                    conversationStore.moveConversation(conversation.id, toSpace: space.id)
-                                                }
+                            ForEach(Array(convos.enumerated()), id: \.element.id) { index, conversation in
+                                ConversationRowView(
+                                    conversation: conversation,
+                                    showSeparator: index < convos.count - 1
+                                )
+                                .contentShape(Rectangle())
+                                .onTapGesture {
+                                    selectedConversationId = conversation.id
+                                }
+                                .contextMenu {
+                                    Menu("Move to Space") {
+                                        Button("None") {
+                                            conversationStore.moveConversation(conversation.id, toSpace: nil)
+                                        }
+                                        ForEach(conversationStore.spaces) { space in
+                                            Button(space.name) {
+                                                conversationStore.moveConversation(conversation.id, toSpace: space.id)
                                             }
                                         }
-                                        Divider()
-                                        Button("Delete", role: .destructive) {
-                                            conversationStore.deleteConversation(conversation.id)
-                                        }
                                     }
+                                    Divider()
+                                    Button("Delete", role: .destructive) {
+                                        conversationStore.deleteConversation(conversation.id)
+                                    }
+                                }
                             }
                         }
                     }
-                    .padding(.bottom, 24)
                 }
+                .padding(.bottom, 24)
             }
         }
         .background(warmBackground)
+    }
+
+    // MARK: - Hero Card
+
+    @ViewBuilder
+    private var heroCard: some View {
+        if !companionManager.allPermissionsGranted {
+            heroCardContainer {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 8) {
+                        SparkleShape()
+                            .fill(accentOrange)
+                            .frame(width: 14, height: 14)
+                        Text("Setup Vibecademy")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(.primary)
+                    }
+                    Text("Grant the required permissions to get started with Sparkle, your AI tutor.")
+                        .font(.system(size: 13))
+                        .foregroundColor(subtleText)
+                        .lineSpacing(2)
+                }
+            }
+        } else if !companionManager.isSparkleCursorEnabled {
+            heroCardContainer {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 8) {
+                            SparkleShape()
+                                .fill(accentOrange)
+                                .frame(width: 14, height: 14)
+                            Text("Meet Sparkle")
+                                .font(.system(size: 15, weight: .semibold))
+                                .foregroundColor(.primary)
+                        }
+                        Text("Your AI tutor that sees your screen and teaches you how to use AI tools — step by step, conversationally.")
+                            .font(.system(size: 13))
+                            .foregroundColor(subtleText)
+                            .lineSpacing(2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Spacer()
+
+                    Button {
+                        companionManager.setSparkleCursorEnabled(true)
+                    } label: {
+                        Text("Activate")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(
+                                Capsule().fill(accentOrange)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { hovering in
+                        if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                    }
+                }
+            }
+        } else {
+            heroCardContainer {
+                HStack(spacing: 12) {
+                    SparkleShape()
+                        .fill(accentOrange)
+                        .frame(width: 14, height: 14)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Sparkle is ready")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(.primary)
+                        Text("Hold  Control + Option  to talk")
+                            .font(.system(size: 12))
+                            .foregroundColor(subtleText)
+                    }
+                    Spacer()
+                    keyCapsulesView
+                }
+            }
+        }
+    }
+
+    private func heroCardContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.6))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(cardBorder, lineWidth: 1)
+            )
+    }
+
+    private var keyCapsulesView: some View {
+        HStack(spacing: 4) {
+            keyCapsule("ctrl")
+            Text("+")
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(subtleText.opacity(0.5))
+            keyCapsule("option")
+        }
+    }
+
+    private func keyCapsule(_ label: String) -> some View {
+        Text(label)
+            .font(.system(size: 10, weight: .medium, design: .rounded))
+            .foregroundColor(subtleText)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(sidebarBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .stroke(cardBorder, lineWidth: 0.5)
+            )
+    }
+
+    // MARK: - Empty State
+
+    private var emptyStateView: some View {
+        VStack(spacing: 16) {
+            SparkleShape()
+                .fill(subtleText.opacity(0.3))
+                .frame(width: 32, height: 32)
+            Text("No conversations yet")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundColor(subtleText)
+            Text("Hold  Control + Option  to talk to Sparkle")
+                .font(.system(size: 13))
+                .foregroundColor(subtleText.opacity(0.6))
+        }
+        .frame(maxWidth: .infinity)
     }
 
     private func dateSectionHeader(_ label: String) -> some View {
@@ -318,47 +590,57 @@ struct MainWindowView: View {
 
 struct ConversationRowView: View {
     let conversation: Conversation
+    var showSeparator: Bool = true
     @State private var isHovered = false
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
-            Image(systemName: "doc.text")
-                .font(.system(size: 14))
-                .foregroundColor(subtleText.opacity(0.5))
-                .frame(width: 32, height: 32)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.white.opacity(0.6))
-                )
+        VStack(spacing: 0) {
+            HStack(alignment: .center, spacing: 12) {
+                Image(systemName: "doc.text")
+                    .font(.system(size: 14))
+                    .foregroundColor(subtleText.opacity(0.5))
+                    .frame(width: 32, height: 32)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(sidebarBackground)
+                    )
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(conversation.displayTitle)
-                    .font(.system(size: 14, weight: .medium))
-                    .lineLimit(1)
-                    .foregroundColor(.primary)
-                Text("Me")
-                    .font(.system(size: 12))
-                    .foregroundColor(subtleText)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(conversation.displayTitle)
+                        .font(.system(size: 14, weight: .medium))
+                        .lineLimit(1)
+                        .foregroundColor(.primary)
+                    Text("Me")
+                        .font(.system(size: 12))
+                        .foregroundColor(subtleText)
+                }
+
+                Spacer()
+
+                HStack(spacing: 6) {
+                    Image(systemName: "doc.on.clipboard")
+                        .font(.system(size: 11))
+                        .foregroundColor(subtleText.opacity(0.4))
+                    Text(timeLabel)
+                        .font(.system(size: 12))
+                        .foregroundColor(subtleText)
+                }
             }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(isHovered ? Color.white.opacity(0.5) : Color.clear)
+            )
+            .padding(.horizontal, 8)
 
-            Spacer()
-
-            HStack(spacing: 6) {
-                Image(systemName: "doc.on.clipboard")
-                    .font(.system(size: 11))
-                    .foregroundColor(subtleText.opacity(0.4))
-                Text(timeLabel)
-                    .font(.system(size: 12))
-                    .foregroundColor(subtleText)
+            if showSeparator {
+                Divider()
+                    .foregroundColor(rowSeparator)
+                    .padding(.leading, 72)
+                    .padding(.trailing, 28)
             }
         }
-        .padding(.horizontal, 28)
-        .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isHovered ? Color.white.opacity(0.5) : Color.clear)
-        )
-        .padding(.horizontal, 8)
         .onHover { hovering in isHovered = hovering }
     }
 
@@ -538,7 +820,7 @@ struct ConversationDetailView: View {
                         .frame(width: 28, height: 28)
 
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("Nate")
+                            Text("Sparkle")
                                 .font(.system(size: 12, weight: .semibold))
                                 .foregroundColor(subtleText)
                             Text(exchange.assistantResponse)
