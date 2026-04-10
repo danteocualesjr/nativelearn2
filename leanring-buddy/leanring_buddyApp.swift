@@ -28,13 +28,13 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
     let conversationStore = ConversationStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("🎯 NativeLearn: Starting...")
-        print("🎯 NativeLearn: Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")")
+        print("🎯 Vibecademy: Starting...")
+        print("🎯 Vibecademy: Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")")
 
         UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 0])
 
-        NativeLearnAnalytics.configure()
-        NativeLearnAnalytics.trackAppOpened()
+        VibecademyAnalytics.configure()
+        VibecademyAnalytics.trackAppOpened()
 
         companionManager.conversationStore = conversationStore
 
@@ -101,7 +101,7 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "NativeLearn"
+        window.title = "Vibecademy"
         window.minSize = NSSize(width: 800, height: 550)
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -110,7 +110,7 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
         window.collectionBehavior = [.fullScreenPrimary]
         window.contentView = NSHostingView(rootView: contentView)
         window.center()
-        window.setFrameAutosaveName("NativeLearnMainWindow")
+        window.setFrameAutosaveName("VibecademyMainWindow")
         window.hidesOnDeactivate = false
 
         window.makeKeyAndOrderFront(nil)
@@ -135,9 +135,9 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
         if loginItemService.status != .enabled {
             do {
                 try loginItemService.register()
-                print("🎯 NativeLearn: Registered as login item")
+                print("🎯 Vibecademy: Registered as login item")
             } catch {
-                print("⚠️ NativeLearn: Failed to register as login item: \(error)")
+                print("⚠️ Vibecademy: Failed to register as login item: \(error)")
             }
         }
     }

@@ -11,10 +11,10 @@
 	<key>VoiceTranscriptionProvider</key>
 	<string>assemblyai</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>NativeLearn uses your microphone so you can talk to Nate, your AI tutor</string>
+	<string>Vibecademy uses your microphone so you can talk to Nate, your AI tutor</string>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>NativeLearn needs screen recording access to see your screen and teach you.</string>
+	<string>Vibecademy needs screen recording access to see your screen and teach you.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>NativeLearn uses speech recognition to transcribe your voice when you talk to Nate</string>
+	<string>Vibecademy uses speech recognition to transcribe your voice when you talk to Nate</string>
 </dict>
 </plist>

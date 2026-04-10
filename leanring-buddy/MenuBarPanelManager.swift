@@ -15,7 +15,7 @@ import AppKit
 import SwiftUI
 
 extension Notification.Name {
-    static let nativeLearnDismissPanel = Notification.Name("nativeLearnDismissPanel")
+    static let vibecademyDismissPanel = Notification.Name("vibecademyDismissPanel")
 }
 
 /// Custom NSPanel subclass that can become the key window even with
@@ -41,7 +41,7 @@ final class MenuBarPanelManager: NSObject {
         createStatusItem()
 
         dismissPanelObserver = NotificationCenter.default.addObserver(
-            forName: .nativeLearnDismissPanel,
+            forName: .vibecademyDismissPanel,
             object: nil,
             queue: .main
         ) { [weak self] _ in
@@ -65,15 +65,15 @@ final class MenuBarPanelManager: NSObject {
 
         guard let button = statusItem?.button else { return }
 
-        button.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "NativeLearn")
+        button.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Vibecademy")
         button.image?.isTemplate = true
         button.action = #selector(statusItemClicked)
         button.target = self
     }
 
-    /// Draws the NativeLearn triangle as a menu bar icon. Uses the same shape
+    /// Draws the Vibecademy triangle as a menu bar icon. Uses the same shape
     /// and rotation as the in-app cursor so the menu bar icon matches.
-    private func makeNativeLearnMenuBarIcon() -> NSImage {
+    private func makeVibecademyMenuBarIcon() -> NSImage {
         let iconSize: CGFloat = 18
         let image = NSImage(size: NSSize(width: iconSize, height: iconSize))
         image.lockFocus()

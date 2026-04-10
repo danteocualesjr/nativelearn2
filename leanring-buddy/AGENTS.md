@@ -28,7 +28,7 @@
   - `displayTitle` — Auto-generates from first user message if no explicit title
 - `Space` — Named folder with icon for organizing conversations
 - `ConversationStore` — `ObservableObject` managing persistence
-  - Saves/loads JSON in `~/Library/Application Support/NativeLearn/`
+  - Saves/loads JSON in `~/Library/Application Support/Vibecademy/`
   - `appendExchange()` — Adds exchange to active conversation (or creates new one)
   - `conversationsGroupedByDate()` — Groups by Today/Yesterday/date labels
   - `createSpace()`, `deleteSpace()`, `moveConversation()` — Space management
@@ -60,5 +60,5 @@
 - `DS.Colors.overlayCursorBlue` — Actually orange (`#FF8C33`), kept the property name for compatibility
 
 ### worker/src/index.ts
-- Cloudflare Worker proxy at `https://nativelearn-proxy.danteocualesjr.workers.dev`
+- Cloudflare Worker proxy at `https://nativelearn-proxy.danteocualesjr.workers.dev` (worker name unchanged)
 - `ELEVENLABS_VOICE_ID` = `pNInz6obpgDQGcFmaJgB` (Adam, male voice)

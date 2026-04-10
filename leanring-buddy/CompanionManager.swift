@@ -122,7 +122,7 @@ final class CompanionManager: ObservableObject {
         claudeAPI.model = model
     }
 
-    /// User preference for whether the NativeLearn cursor should be shown.
+    /// User preference for whether the Vibecademy cursor should be shown.
     /// When toggled off, the overlay is hidden and push-to-talk is disabled.
     /// Persisted to UserDefaults so the choice survives app restarts.
     @Published var isNateCursorEnabled: Bool = UserDefaults.standard.object(forKey: "isNateCursorEnabled") == nil
@@ -180,7 +180,7 @@ final class CompanionManager: ObservableObject {
 
     func start() {
         refreshAllPermissions()
-        print("🔑 NativeLearn start — accessibility: \(hasAccessibilityPermission), screen: \(hasScreenRecordingPermission), mic: \(hasMicrophonePermission), screenContent: \(hasScreenContentPermission), onboarded: \(hasCompletedOnboarding)")
+        print("🔑 Vibecademy start — accessibility: \(hasAccessibilityPermission), screen: \(hasScreenRecordingPermission), mic: \(hasMicrophonePermission), screenContent: \(hasScreenContentPermission), onboarded: \(hasCompletedOnboarding)")
         startPermissionPolling()
         bindVoiceStateObservation()
         bindAudioPowerLevel()
@@ -206,13 +206,13 @@ final class CompanionManager: ObservableObject {
     /// the overlay so the welcome animation and intro video play.
     func triggerOnboarding() {
         // Post notification so the panel manager can dismiss the panel
-        NotificationCenter.default.post(name: .nativeLearnDismissPanel, object: nil)
+        NotificationCenter.default.post(name: .vibecademyDismissPanel, object: nil)
 
         // Mark onboarding as completed so the Start button won't appear
         // again on future launches — the cursor will auto-show instead
         hasCompletedOnboarding = true
 
-        NativeLearnAnalytics.trackOnboardingStarted()
+        VibecademyAnalytics.trackOnboardingStarted()
 
         // Play Besaid theme at 60% volume, fade out after 1m 30s
         startOnboardingMusic()
@@ -227,8 +227,8 @@ final class CompanionManager: ObservableObject {
     /// footer link. Same flow as triggerOnboarding but the cursor overlay
     /// is already visible so we just restart the welcome animation and video.
     func replayOnboarding() {
-        NotificationCenter.default.post(name: .nativeLearnDismissPanel, object: nil)
-        NativeLearnAnalytics.trackOnboardingReplayed()
+        NotificationCenter.default.post(name: .vibecademyDismissPanel, object: nil)
+        VibecademyAnalytics.trackOnboardingReplayed()
         startOnboardingMusic()
         // Tear down any existing overlays and recreate with isFirstAppearance = true
         overlayWindowManager.hasShownOverlayBefore = false
@@ -246,7 +246,7 @@ final class CompanionManager: ObservableObject {
     private func startOnboardingMusic() {
         stopOnboardingMusic()
         guard let musicURL = Bundle.main.url(forResource: "ff", withExtension: "mp3") else {
-            print("⚠️ NativeLearn: ff.mp3 not found in bundle")
+            print("⚠️ Vibecademy: ff.mp3 not found in bundle")
             return
         }
 
@@ -261,7 +261,7 @@ final class CompanionManager: ObservableObject {
                 self?.fadeOutOnboardingMusic()
             }
         } catch {
-            print("⚠️ NativeLearn: Failed to play onboarding music: \(error)")
+            print("⚠️ Vibecademy: Failed to play onboarding music: \(error)")
         }
     }
 
@@ -337,13 +337,13 @@ final class CompanionManager: ObservableObject {
 
         // Track individual permission grants as they happen
         if !previouslyHadAccessibility && hasAccessibilityPermission {
-            NativeLearnAnalytics.trackPermissionGranted(permission: "accessibility")
+            VibecademyAnalytics.trackPermissionGranted(permission: "accessibility")
         }
         if !previouslyHadScreenRecording && hasScreenRecordingPermission {
-            NativeLearnAnalytics.trackPermissionGranted(permission: "screen_recording")
+            VibecademyAnalytics.trackPermissionGranted(permission: "screen_recording")
         }
         if !previouslyHadMicrophone && hasMicrophonePermission {
-            NativeLearnAnalytics.trackPermissionGranted(permission: "microphone")
+            VibecademyAnalytics.trackPermissionGranted(permission: "microphone")
         }
         // Screen content permission is persisted — once the user has approved the
         // SCShareableContent picker, we don't need to re-check it.
@@ -352,7 +352,7 @@ final class CompanionManager: ObservableObject {
         }
 
         if !previouslyHadAll && allPermissionsGranted {
-            NativeLearnAnalytics.trackAllPermissionsGranted()
+            VibecademyAnalytics.trackAllPermissionsGranted()
         }
     }
 
@@ -385,7 +385,7 @@ final class CompanionManager: ObservableObject {
                     guard didCapture else { return }
                     hasScreenContentPermission = true
                     UserDefaults.standard.set(true, forKey: "hasScreenContentPermission")
-                    NativeLearnAnalytics.trackPermissionGranted(permission: "screen_content")
+                    VibecademyAnalytics.trackPermissionGranted(permission: "screen_content")
 
                     if allPermissionsGranted && !isOverlayVisible && isNateCursorEnabled {
                         hasCompletedOnboarding = true
@@ -495,7 +495,7 @@ final class CompanionManager: ObservableObject {
             }
 
             // Dismiss the menu bar panel so it doesn't cover the screen
-            NotificationCenter.default.post(name: .nativeLearnDismissPanel, object: nil)
+            NotificationCenter.default.post(name: .vibecademyDismissPanel, object: nil)
 
             // Cancel any in-progress response and TTS from a previous utterance
             currentResponseTask?.cancel()
@@ -514,7 +514,7 @@ final class CompanionManager: ObservableObject {
             }
     
 
-            NativeLearnAnalytics.trackPushToTalkStarted()
+            VibecademyAnalytics.trackPushToTalkStarted()
 
             pendingKeyboardShortcutStartTask?.cancel()
             pendingKeyboardShortcutStartTask = Task {
@@ -526,7 +526,7 @@ final class CompanionManager: ObservableObject {
                     submitDraftText: { [weak self] finalTranscript in
                         self?.lastTranscript = finalTranscript
                         print("🗣️ Companion received transcript: \(finalTranscript)")
-                        NativeLearnAnalytics.trackUserMessageSent(transcript: finalTranscript)
+                        VibecademyAnalytics.trackUserMessageSent(transcript: finalTranscript)
                         self?.sendTranscriptToClaudeWithScreenshot(transcript: finalTranscript)
                     }
                 )
@@ -536,7 +536,7 @@ final class CompanionManager: ObservableObject {
             // before the async startPushToTalk had a chance to begin recording.
             // Without this, a quick press-and-release drops the release event and
             // leaves the waveform overlay stuck on screen indefinitely.
-            NativeLearnAnalytics.trackPushToTalkReleased()
+            VibecademyAnalytics.trackPushToTalkReleased()
             pendingKeyboardShortcutStartTask?.cancel()
             pendingKeyboardShortcutStartTask = nil
             buddyDictationManager.stopPushToTalkFromKeyboardShortcut()
@@ -689,7 +689,7 @@ final class CompanionManager: ObservableObject {
 
                     detectedElementScreenLocation = globalLocation
                     detectedElementDisplayFrame = displayFrame
-                    NativeLearnAnalytics.trackElementPointed(elementLabel: parseResult.elementLabel)
+                    VibecademyAnalytics.trackElementPointed(elementLabel: parseResult.elementLabel)
                     print("🎯 Element pointing: (\(Int(pointCoordinate.x)), \(Int(pointCoordinate.y))) → \"\(parseResult.elementLabel ?? "element")\"")
                 } else {
                     print("🎯 Element pointing: \(parseResult.elementLabel ?? "no element")")
@@ -711,7 +711,7 @@ final class CompanionManager: ObservableObject {
 
                 print("🧠 Conversation history: \(conversationHistory.count) exchanges")
 
-                NativeLearnAnalytics.trackAIResponseReceived(response: spokenText)
+                VibecademyAnalytics.trackAIResponseReceived(response: spokenText)
 
                 // Play the response via TTS. Keep the spinner (processing state)
                 // until the audio actually starts playing, then switch to responding.
@@ -721,7 +721,7 @@ final class CompanionManager: ObservableObject {
                         // speakText returns after player.play() — audio is now playing
                         voiceState = .responding
                     } catch {
-                        NativeLearnAnalytics.trackTTSError(error: error.localizedDescription)
+                        VibecademyAnalytics.trackTTSError(error: error.localizedDescription)
                         print("⚠️ ElevenLabs TTS error: \(error)")
                         speakCreditsErrorFallback()
                     }
@@ -729,7 +729,7 @@ final class CompanionManager: ObservableObject {
             } catch is CancellationError {
                 // User spoke again — response was interrupted
             } catch {
-                NativeLearnAnalytics.trackResponseError(error: error.localizedDescription)
+                VibecademyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
                 speakCreditsErrorFallback()
             }

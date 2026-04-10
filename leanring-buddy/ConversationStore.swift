@@ -5,7 +5,7 @@
 //  Persistent storage for voice conversations between the user and Nate.
 //  Each conversation is a session (from first push-to-talk to last),
 //  containing multiple exchanges (user transcript + Nate response).
-//  Stored as JSON files in ~/Library/Application Support/NativeLearn/.
+//  Stored as JSON files in ~/Library/Application Support/Vibecademy/.
 //
 
 import Combine
@@ -79,7 +79,7 @@ final class ConversationStore: ObservableObject {
 
     init() {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        storageDirectory = appSupport.appendingPathComponent("NativeLearn", isDirectory: true)
+        storageDirectory = appSupport.appendingPathComponent("Vibecademy", isDirectory: true)
 
         try? FileManager.default.createDirectory(at: storageDirectory, withIntermediateDirectories: true)
 

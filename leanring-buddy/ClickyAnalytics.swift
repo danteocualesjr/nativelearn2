@@ -9,7 +9,7 @@
 import Foundation
 import PostHog
 
-enum NativeLearnAnalytics {
+enum VibecademyAnalytics {
 
     // MARK: - Setup
 

@@ -1,6 +1,6 @@
-# NativeLearn
+# Vibecademy
 
-An AI tutor that lives on your Mac. NativeLearn places a companion cursor called **Nate** (a small orange circle) right next to your pointer that can see your screen, listen to your voice, and teach you how to use AI tools step by step.
+An AI tutor that lives on your Mac. Vibecademy places a companion cursor called **Nate** (a small orange circle) right next to your pointer that can see your screen, listen to your voice, and teach you how to use AI tools step by step.
 
 ## What it does
 
@@ -42,7 +42,7 @@ Update the voice ID in `wrangler.toml` if desired, then deploy:
 npx wrangler deploy
 ```
 
-Note the worker URL (e.g., `https://nativelearn-proxy.<your-subdomain>.workers.dev`).
+Note the worker URL (e.g., `https://vibecademy-proxy.<your-subdomain>.workers.dev`).
 
 ### 2. Update the Worker URL in Swift
 
@@ -61,7 +61,7 @@ open leanring-buddy.xcodeproj
 
 ## Usage
 
-1. Open NativeLearn — the desktop app window appears with a "Meet Nate" hero card
+1. Open Vibecademy — the desktop app window appears with a "Meet Nate" hero card
 2. Click **Turn on Nate** to activate the companion cursor, or use the toggle in the sidebar
 3. Hold **Control + Option** to activate push-to-talk
 4. Ask Nate something like: "Hey Nate, I want to learn how to use Cursor. Can you show me?"

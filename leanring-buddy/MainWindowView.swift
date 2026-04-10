@@ -155,7 +155,7 @@ struct MainWindowView: View {
                 Image(systemName: "circle.fill")
                     .font(.system(size: 7))
                     .foregroundColor(accentOrange)
-                Text("NativeLearn")
+                Text("Vibecademy")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(subtleText)
                 Spacer()
