@@ -351,6 +351,7 @@ struct BlueCursorView: View {
                     startWelcomeAnimation()
                 }
             } else {
+                self.showWelcome = false
                 self.cursorOpacity = 1.0
             }
         }

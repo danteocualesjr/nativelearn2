@@ -189,11 +189,11 @@ final class CompanionManager: ObservableObject {
         // well before the onboarding demo fires at ~40s into the video.
         _ = claudeAPI
 
-        // Show the cursor overlay immediately if all permissions are granted.
-        // Mark onboarding as completed so the panel doesn't show the Start
-        // button on subsequent launches.
-        if allPermissionsGranted && isNateCursorEnabled {
-            hasCompletedOnboarding = true
+        // Show the cursor overlay on launch so Nate's circle is always visible.
+        if isNateCursorEnabled {
+            if allPermissionsGranted {
+                hasCompletedOnboarding = true
+            }
             overlayWindowManager.hasShownOverlayBefore = true
             overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
             isOverlayVisible = true
