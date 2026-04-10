@@ -20,7 +20,7 @@ All API keys live on a Cloudflare Worker proxy — nothing sensitive ships in th
 Built on top of [Clicky](https://github.com/farzaa/clicky) by Farza. Major changes from the original:
 
 - Rebranded from "Clicky" to "Vibecademy" with AI tutor persona "Nate"
-- Changed companion icon from blue triangle to small orange filled circle
+- Changed companion icon from blue triangle to orange sparkle
 - Changed from menu-bar-only app to full desktop app with main window (`LSUIElement=false`)
 - Added persistent conversation storage (JSON files in Application Support)
 - Added desktop window with sidebar navigation (Home, Chat, Spaces) and conversation history
@@ -41,7 +41,7 @@ Built on top of [Clicky](https://github.com/farzaa/clicky) by Farza. Major chang
 - **Text-to-Speech**: ElevenLabs (`eleven_flash_v2_5` model, male "Adam" voice) via Cloudflare Worker proxy
 - **Screen Capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
 - **Voice Input**: Push-to-talk (Control+Option) via `AVAudioEngine` + pluggable transcription-provider layer. System-wide keyboard shortcut via listen-only CGEvent tap.
-- **Companion Icon**: Small orange filled circle — used in cursor overlay, menu bar, and transcript UI
+- **Companion Icon**: Orange sparkle (`sparkle` SF Symbol) — used in cursor overlay, menu bar, and transcript UI
 - **Element Pointing**: Claude embeds `[POINT:x,y:label:screenN]` tags in responses. The overlay parses these, maps coordinates to the correct monitor, and animates the circle along a bezier arc to the target.
 - **Conversation Persistence**: JSON files in `~/Library/Application Support/Vibecademy/`. Conversations are auto-saved during voice interactions and grouped by date in the UI.
 - **Concurrency**: `@MainActor` isolation, async/await throughout
@@ -100,7 +100,7 @@ Worker vars: `ELEVENLABS_VOICE_ID` (set to `pNInz6obpgDQGcFmaJgB` — Adam male 
 | `OpenAIAPI.swift` | ~142 | OpenAI GPT vision API client. |
 | `ElevenLabsTTSClient.swift` | ~81 | ElevenLabs TTS client. Sends text to the Worker proxy, plays back audio via `AVAudioPlayer`. Exposes `isPlaying` for transient cursor scheduling. |
 | `ElementLocationDetector.swift` | ~335 | Detects UI element locations in screenshots for cursor pointing. |
-| `DesignSystem.swift` | ~879 | Design system tokens — colors, corner radii, shared styles. All UI references `DS.Colors`, `DS.CornerRadius`, etc. `overlayCursorBlue` is actually orange (`#FF8C33`). |
+| `DesignSystem.swift` | ~879 | Design system tokens — colors, corner radii, shared styles. All UI references `DS.Colors`, `DS.CornerRadius`, etc. `overlayCursorBlue` is actually orange (`#FF8C33`), used for the sparkle icon. |
 | `ClickyAnalytics.swift` | ~122 | PostHog analytics integration (`VibecademyAnalytics`) for usage tracking. |
 | `WindowPositionManager.swift` | ~262 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
 | `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader for keys stored in the app bundle Info.plist. |

@@ -45,19 +45,19 @@
 
 ### MenuBarPanelManager.swift
 - `MenuBarPanelManager` — `@MainActor` class for menu bar status item
-  - Menu bar icon: `circle.fill` SF Symbol (template mode)
+  - Menu bar icon: `sparkle` SF Symbol (template mode)
   - Floating `NSPanel` for companion controls
   - Panel is draggable (`isMovableByWindowBackground = true`)
 
 ### OverlayWindow.swift
 - Full-screen transparent overlay hosting the cursor companion
-- Small orange filled circle with glow shadow
+- Orange sparkle icon (`sparkle` SF Symbol) with glow shadow
 - Waveform view replaces cap while listening
 - Spinner replaces cap while processing
 - Bezier arc flight animations for element pointing
 
 ### DesignSystem.swift
-- `DS.Colors.overlayCursorBlue` — Actually orange (`#FF8C33`), kept the property name for compatibility
+- `DS.Colors.overlayCursorBlue` — Actually orange (`#FF8C33`), used for the sparkle icon; kept the property name for compatibility
 
 ### worker/src/index.ts
 - Cloudflare Worker proxy at `https://nativelearn-proxy.danteocualesjr.workers.dev` (worker name unchanged)

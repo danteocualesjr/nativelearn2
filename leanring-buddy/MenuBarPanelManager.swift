@@ -65,39 +65,37 @@ final class MenuBarPanelManager: NSObject {
 
         guard let button = statusItem?.button else { return }
 
-        button.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "Vibecademy")
+        button.image = makeVibecademyMenuBarIcon()
         button.image?.isTemplate = true
         button.action = #selector(statusItemClicked)
         button.target = self
     }
 
-    /// Draws the Vibecademy triangle as a menu bar icon. Uses the same shape
-    /// and rotation as the in-app cursor so the menu bar icon matches.
+    /// Draws a four-pointed sparkle star as the menu bar icon.
     private func makeVibecademyMenuBarIcon() -> NSImage {
         let iconSize: CGFloat = 18
         let image = NSImage(size: NSSize(width: iconSize, height: iconSize))
         image.lockFocus()
 
-        let triangleSize = iconSize * 0.7
-        let cx = iconSize * 0.50
-        let cy = iconSize * 0.50
-        let height = triangleSize * sqrt(3.0) / 2.0
-
-        let top = CGPoint(x: cx, y: cy + height / 1.5)
-        let bottomLeft = CGPoint(x: cx - triangleSize / 2, y: cy - height / 3)
-        let bottomRight = CGPoint(x: cx + triangleSize / 2, y: cy - height / 3)
-
-        let angle = 35.0 * .pi / 180.0
-        func rotate(_ point: CGPoint) -> CGPoint {
-            let dx = point.x - cx, dy = point.y - cy
-            let cosA = CGFloat(cos(angle)), sinA = CGFloat(sin(angle))
-            return CGPoint(x: cx + cosA * dx - sinA * dy, y: cy + sinA * dx + cosA * dy)
-        }
+        let center = CGPoint(x: iconSize / 2, y: iconSize / 2)
+        let outerRadius = iconSize * 0.42
+        let innerRadius = outerRadius * 0.35
+        let pointCount = 4
 
         let path = NSBezierPath()
-        path.move(to: rotate(top))
-        path.line(to: rotate(bottomLeft))
-        path.line(to: rotate(bottomRight))
+        for i in 0..<(pointCount * 2) {
+            let angle = (CGFloat.pi / CGFloat(pointCount)) * CGFloat(i) - .pi / 2
+            let radius = i % 2 == 0 ? outerRadius : innerRadius
+            let point = CGPoint(
+                x: center.x + cos(angle) * radius,
+                y: center.y + sin(angle) * radius
+            )
+            if i == 0 {
+                path.move(to: point)
+            } else {
+                path.line(to: point)
+            }
+        }
         path.close()
 
         NSColor.black.setFill()

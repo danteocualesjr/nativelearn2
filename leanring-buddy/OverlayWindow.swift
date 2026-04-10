@@ -2,7 +2,7 @@
 //  OverlayWindow.swift
 //  leanring-buddy
 //
-//  System-wide transparent overlay window for blue glowing cursor.
+//  System-wide transparent overlay window for glowing sparkle cursor.
 //  One OverlayWindow is created per screen so the cursor buddy
 //  seamlessly follows the cursor across multiple monitors.
 //
@@ -70,6 +70,38 @@ struct Triangle: Shape {
     }
 }
 
+/// Four-pointed star with sharp tips. Alternates between outer points
+/// (top, right, bottom, left) and inner points (at 45° diagonals).
+/// `innerRadiusRatio` controls how pinched the waist is — lower values
+/// produce sharper, more dramatic points.
+struct SparkleShape: Shape {
+    var innerRadiusRatio: CGFloat = 0.35
+
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let outerRadius = min(rect.width, rect.height) / 2.0
+        let innerRadius = outerRadius * innerRadiusRatio
+        let pointCount = 4
+
+        var path = Path()
+        for i in 0..<(pointCount * 2) {
+            let angle = (.pi / CGFloat(pointCount)) * CGFloat(i) - .pi / 2
+            let radius = i.isMultiple(of: 2) ? outerRadius : innerRadius
+            let point = CGPoint(
+                x: center.x + cos(angle) * radius,
+                y: center.y + sin(angle) * radius
+            )
+            if i == 0 {
+                path.move(to: point)
+            } else {
+                path.addLine(to: point)
+            }
+        }
+        path.closeSubpath()
+        return path
+    }
+}
+
 // PreferenceKey for tracking bubble size
 struct SizePreferenceKey: PreferenceKey {
     static var defaultValue: CGSize = .zero
@@ -96,10 +128,10 @@ enum BuddyNavigationMode {
     case pointingAtTarget
 }
 
-// SwiftUI view for the blue glowing cursor pointer.
+// SwiftUI view for the glowing sparkle cursor.
 // Each screen gets its own BlueCursorView. The view checks whether
 // the cursor is currently on THIS screen and only shows the buddy
-// triangle when it is. During voice interaction, the triangle is
+// sparkle when it is. During voice interaction, the sparkle is
 // replaced by a waveform (listening), spinner (processing), or
 // streaming text bubble (responding).
 struct BlueCursorView: View {
@@ -294,13 +326,13 @@ struct BlueCursorView: View {
                     }
             }
 
-            // Circle cursor — shown when idle or while TTS is playing.
-            // All three states (circle, waveform, spinner) stay in the view tree
+            // Sparkle cursor — shown when idle or while TTS is playing.
+            // All three states (sparkle, waveform, spinner) stay in the view tree
             // permanently and cross-fade via opacity so SwiftUI doesn't remove/re-insert
             // them (which caused a visible cursor "pop").
-            Circle()
+            SparkleShape()
                 .fill(DS.Colors.overlayCursorBlue)
-                .frame(width: 8, height: 8)
+                .frame(width: 12, height: 12)
                 .shadow(color: DS.Colors.overlayCursorBlue, radius: 3 + (buddyFlightScale - 1.0) * 10, x: 0, y: 0)
                 .scaleEffect(buddyFlightScale)
                 .opacity(buddyIsVisibleOnThisScreen && !showWelcome && (companionManager.voiceState == .idle || companionManager.voiceState == .responding) ? cursorOpacity : 0)
@@ -378,7 +410,7 @@ struct BlueCursorView: View {
         }
     }
 
-    /// Whether the buddy triangle should be visible on this screen.
+    /// Whether the buddy sparkle should be visible on this screen.
     /// True when cursor is on this screen during normal following, or
     /// when navigating/pointing at a target on this screen. When another
     /// screen is navigating (detectedElementScreenLocation is set but this

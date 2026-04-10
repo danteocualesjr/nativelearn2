@@ -152,9 +152,9 @@ struct MainWindowView: View {
             // Footer
             Divider().opacity(0.5)
             HStack(spacing: 8) {
-                Image(systemName: "circle.fill")
-                    .font(.system(size: 7))
-                    .foregroundColor(accentOrange)
+                SparkleShape()
+                    .fill(accentOrange)
+                    .frame(width: 10, height: 10)
                 Text("Vibecademy")
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(subtleText)
@@ -248,9 +248,9 @@ struct MainWindowView: View {
             if filteredGroups.isEmpty {
                 Spacer()
                 VStack(spacing: 16) {
-                    Image(systemName: "circle.fill")
-                        .font(.system(size: 24))
-                        .foregroundColor(subtleText.opacity(0.3))
+                    SparkleShape()
+                        .fill(subtleText.opacity(0.3))
+                        .frame(width: 32, height: 32)
                     Text("No conversations yet")
                         .font(.system(size: 17, weight: .medium))
                         .foregroundColor(subtleText)
@@ -300,9 +300,9 @@ struct MainWindowView: View {
     private func dateSectionHeader(_ label: String) -> some View {
         HStack(spacing: 8) {
             if label == "Today" {
-                Circle()
+                SparkleShape()
                     .fill(accentOrange)
-                    .frame(width: 8, height: 8)
+                    .frame(width: 10, height: 10)
             }
             Text(label)
                 .font(.system(size: 13, weight: .semibold))
@@ -529,9 +529,13 @@ struct ConversationDetailView: View {
                     }
 
                     HStack(alignment: .top, spacing: 12) {
-                        Circle()
-                            .fill(accentOrange)
-                            .frame(width: 20, height: 20)
+                        ZStack {
+                            Circle().fill(accentOrange)
+                            SparkleShape()
+                                .fill(.white)
+                                .frame(width: 14, height: 14)
+                        }
+                        .frame(width: 28, height: 28)
 
                         VStack(alignment: .leading, spacing: 3) {
                             Text("Nate")
