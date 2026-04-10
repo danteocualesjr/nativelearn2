@@ -102,10 +102,11 @@ final class CompanionManager: ObservableObject {
     /// speaks again before the delay elapses.
     private var transientHideTask: Task<Void, Never>?
 
-    /// True when all three required permissions (accessibility, screen recording,
-    /// microphone) are granted. Used by the panel to show a single "all good" state.
+    /// True when core permissions (accessibility, screen recording, microphone)
+    /// are granted. Screen content is verified lazily on first capture, so it
+    /// doesn't block the overlay from appearing.
     var allPermissionsGranted: Bool {
-        hasAccessibilityPermission && hasScreenRecordingPermission && hasMicrophonePermission && hasScreenContentPermission
+        hasAccessibilityPermission && hasScreenRecordingPermission && hasMicrophonePermission
     }
 
     /// Whether the blue cursor overlay is currently visible on screen.
@@ -125,7 +126,7 @@ final class CompanionManager: ObservableObject {
     /// When toggled off, the overlay is hidden and push-to-talk is disabled.
     /// Persisted to UserDefaults so the choice survives app restarts.
     @Published var isNateCursorEnabled: Bool = UserDefaults.standard.object(forKey: "isNateCursorEnabled") == nil
-        ? false
+        ? true
         : UserDefaults.standard.bool(forKey: "isNateCursorEnabled")
 
     func setNateCursorEnabled(_ enabled: Bool) {
@@ -188,11 +189,11 @@ final class CompanionManager: ObservableObject {
         // well before the onboarding demo fires at ~40s into the video.
         _ = claudeAPI
 
-        // If the user already completed onboarding AND all permissions are
-        // still granted, show the cursor overlay immediately. If permissions
-        // were revoked (e.g. signing change), don't show the cursor — the
-        // panel will show the permissions UI instead.
-        if hasCompletedOnboarding && allPermissionsGranted && isNateCursorEnabled {
+        // Show the cursor overlay immediately if all permissions are granted.
+        // Mark onboarding as completed so the panel doesn't show the Start
+        // button on subsequent launches.
+        if allPermissionsGranted && isNateCursorEnabled {
+            hasCompletedOnboarding = true
             overlayWindowManager.hasShownOverlayBefore = true
             overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
             isOverlayVisible = true
@@ -386,8 +387,8 @@ final class CompanionManager: ObservableObject {
                     UserDefaults.standard.set(true, forKey: "hasScreenContentPermission")
                     NativeLearnAnalytics.trackPermissionGranted(permission: "screen_content")
 
-                    // If onboarding was already completed, show the cursor overlay now
-                    if hasCompletedOnboarding && allPermissionsGranted && !isOverlayVisible && isNateCursorEnabled {
+                    if allPermissionsGranted && !isOverlayVisible && isNateCursorEnabled {
+                        hasCompletedOnboarding = true
                         overlayWindowManager.hasShownOverlayBefore = true
                         overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
                         isOverlayVisible = true
@@ -570,7 +571,7 @@ final class CompanionManager: ObservableObject {
     - if you receive multiple screen images, the one labeled "primary focus" is where the cursor is — prioritize that one but reference others if relevant.
 
     element pointing:
-    you have a small orange graduation cap icon that can fly to and point at things on screen. as a tutor, pointing is your most powerful teaching tool — use it liberally. whenever you're telling the user to click something, look at something, or navigate somewhere, point at it. this makes your tutorials feel like having a real teacher sitting next to them.
+    you have a small orange circle icon that can fly to and point at things on screen. as a tutor, pointing is your most powerful teaching tool — use it liberally. whenever you're telling the user to click something, look at something, or navigate somewhere, point at it. this makes your tutorials feel like having a real teacher sitting next to them.
 
     always point when: guiding through UI, showing where buttons are, teaching navigation, demonstrating workflows, helping find menus or settings.
 
@@ -914,7 +915,7 @@ final class CompanionManager: ObservableObject {
     // MARK: - Onboarding Demo Interaction
 
     private static let onboardingDemoSystemPrompt = """
-    you're nate, a small orange graduation cap buddy and AI tutor living on the user's screen. you're showing off during onboarding — look at their screen and find ONE specific, concrete thing to point at. pick something with a clear name or identity: a specific app icon (say its name), a specific word or phrase of text you can read, a specific filename, a specific button label, a specific tab title, a specific image you can describe. do NOT point at vague things like "a window" or "some text" — be specific about exactly what you see.
+    you're nate, a small orange circle buddy and AI tutor living on the user's screen. you're showing off during onboarding — look at their screen and find ONE specific, concrete thing to point at. pick something with a clear name or identity: a specific app icon (say its name), a specific word or phrase of text you can read, a specific filename, a specific button label, a specific tab title, a specific image you can describe. do NOT point at vague things like "a window" or "some text" — be specific about exactly what you see.
 
     make a short quirky 3-6 word observation about the specific thing you picked — something fun, playful, or curious that shows you actually read/recognized it. no emojis ever. NEVER quote or repeat text you see on screen — just react to it. keep it to 6 words max, no exceptions.
 

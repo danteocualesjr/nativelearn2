@@ -294,13 +294,13 @@ struct BlueCursorView: View {
                     }
             }
 
-            // Graduation cap cursor — shown when idle or while TTS is playing.
-            // All three states (cap, waveform, spinner) stay in the view tree
+            // Circle cursor — shown when idle or while TTS is playing.
+            // All three states (circle, waveform, spinner) stay in the view tree
             // permanently and cross-fade via opacity so SwiftUI doesn't remove/re-insert
             // them (which caused a visible cursor "pop").
-            Image(systemName: "graduationcap.fill")
-                .font(.system(size: 16, weight: .bold))
-                .foregroundColor(DS.Colors.overlayCursorBlue)
+            Circle()
+                .fill(DS.Colors.overlayCursorBlue)
+                .frame(width: 12, height: 12)
                 .shadow(color: DS.Colors.overlayCursorBlue, radius: 8 + (buddyFlightScale - 1.0) * 20, x: 0, y: 0)
                 .scaleEffect(buddyFlightScale)
                 .opacity(buddyIsVisibleOnThisScreen && (companionManager.voiceState == .idle || companionManager.voiceState == .responding) ? cursorOpacity : 0)

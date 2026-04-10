@@ -65,7 +65,7 @@ final class MenuBarPanelManager: NSObject {
 
         guard let button = statusItem?.button else { return }
 
-        button.image = NSImage(systemSymbolName: "graduationcap.fill", accessibilityDescription: "NativeLearn")
+        button.image = NSImage(systemSymbolName: "circle.fill", accessibilityDescription: "NativeLearn")
         button.image?.isTemplate = true
         button.action = #selector(statusItemClicked)
         button.target = self

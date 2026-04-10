@@ -2,22 +2,29 @@
 //  MainWindowView.swift
 //  leanring-buddy
 //
-//  The primary desktop window with a Granola-style sidebar + main panel.
-//  Sidebar: search, Home, Chat, Spaces. Main panel: conversation list
-//  grouped by date, or conversation detail view.
+//  Primary desktop window styled after Granola. Left sidebar with search,
+//  navigation, and spaces. Main panel shows conversation sessions grouped
+//  by date, or a conversation detail view with summary + transcript.
 //
 
 import SwiftUI
+
+private let warmBackground = Color(red: 0.98, green: 0.97, blue: 0.95)
+private let sidebarBackground = Color(red: 0.96, green: 0.95, blue: 0.92)
+private let sidebarSelected = Color(red: 0.93, green: 0.91, blue: 0.88)
+private let sidebarHover = Color(red: 0.94, green: 0.93, blue: 0.90)
+private let subtleText = Color(red: 0.55, green: 0.53, blue: 0.50)
+private let accentOrange = Color(red: 0.95, green: 0.55, blue: 0.20)
 
 struct MainWindowView: View {
     @ObservedObject var conversationStore: ConversationStore
     @ObservedObject var companionManager: CompanionManager
     @State private var selectedConversationId: UUID?
-    @State private var selectedSpaceId: UUID?
     @State private var searchText: String = ""
     @State private var sidebarSelection: SidebarItem = .home
     @State private var isCreatingSpace = false
     @State private var newSpaceName = ""
+    @State private var hoveredSidebarItem: SidebarItem?
 
     enum SidebarItem: Hashable {
         case home
@@ -26,152 +33,171 @@ struct MainWindowView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            sidebarContent
-                .navigationSplitViewColumnWidth(min: 200, ideal: 220, max: 280)
-        } detail: {
+        HStack(spacing: 0) {
+            sidebarView
+                .frame(width: 220)
+            Divider()
             detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .frame(minWidth: 800, minHeight: 550)
-        .background(Color(nsColor: .controlBackgroundColor))
+        .background(warmBackground)
     }
 
     // MARK: - Sidebar
 
-    private var sidebarContent: some View {
+    private var sidebarView: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack {
+            Spacer().frame(height: 52)
+
+            // Search
+            HStack(spacing: 8) {
                 Image(systemName: "magnifyingglass")
-                    .foregroundColor(.secondary)
                     .font(.system(size: 13))
+                    .foregroundColor(subtleText)
                 TextField("Search", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 13))
+                Spacer()
+                Text("⌘K")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundColor(subtleText.opacity(0.6))
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .stroke(subtleText.opacity(0.2), lineWidth: 1)
+                    )
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(Color(nsColor: .quaternarySystemFill))
+                    .fill(warmBackground)
             )
             .padding(.horizontal, 12)
-            .padding(.top, 12)
-            .padding(.bottom, 8)
+            .padding(.bottom, 16)
 
-            List(selection: Binding(
-                get: { sidebarSelection },
-                set: { newValue in
-                    if let val = newValue {
-                        sidebarSelection = val
-                        selectedConversationId = nil
-                    }
-                }
-            )) {
-                Section {
-                    Label("Home", systemImage: "house")
-                        .tag(SidebarItem.home)
-                    Label("Chat", systemImage: "bubble.left.and.bubble.right")
-                        .tag(SidebarItem.chat)
-                }
+            // Navigation
+            VStack(spacing: 2) {
+                sidebarRow(item: .home, icon: "house", label: "Home")
+                sidebarRow(item: .chat, icon: "bubble.left.and.bubble.right", label: "Chat")
+            }
+            .padding(.horizontal, 8)
 
-                Section("Spaces") {
-                    ForEach(conversationStore.spaces) { space in
-                        Label(space.name, systemImage: space.icon)
-                            .tag(SidebarItem.space(space.id))
-                            .contextMenu {
-                                Button("Delete Space", role: .destructive) {
-                                    conversationStore.deleteSpace(space.id)
-                                    if case .space(let id) = sidebarSelection, id == space.id {
-                                        sidebarSelection = .home
-                                    }
+            // Spaces
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Spaces")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(subtleText.opacity(0.7))
+                    .textCase(.uppercase)
+                    .tracking(0.5)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 20)
+                    .padding(.bottom, 6)
+
+                ForEach(conversationStore.spaces) { space in
+                    sidebarRow(item: .space(space.id), icon: space.icon, label: space.name)
+                        .contextMenu {
+                            Button("Delete Space", role: .destructive) {
+                                conversationStore.deleteSpace(space.id)
+                                if case .space(let id) = sidebarSelection, id == space.id {
+                                    sidebarSelection = .home
                                 }
                             }
-                    }
-
-                    if isCreatingSpace {
-                        HStack(spacing: 6) {
-                            Image(systemName: "folder")
-                                .foregroundColor(.secondary)
-                            TextField("Space name", text: $newSpaceName, onCommit: {
-                                let name = newSpaceName.trimmingCharacters(in: .whitespaces)
-                                if !name.isEmpty {
-                                    conversationStore.createSpace(name: name)
-                                }
-                                newSpaceName = ""
-                                isCreatingSpace = false
-                            })
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 13))
                         }
-                    }
-
-                    Button {
-                        isCreatingSpace = true
-                    } label: {
-                        Label("Add folder", systemImage: "folder.badge.plus")
-                            .foregroundColor(.secondary)
-                    }
-                    .buttonStyle(.plain)
                 }
+
+                if isCreatingSpace {
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 13))
+                            .foregroundColor(subtleText)
+                            .frame(width: 20)
+                        TextField("Space name", text: $newSpaceName, onCommit: {
+                            let name = newSpaceName.trimmingCharacters(in: .whitespaces)
+                            if !name.isEmpty {
+                                conversationStore.createSpace(name: name)
+                            }
+                            newSpaceName = ""
+                            isCreatingSpace = false
+                        })
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                }
+
+                Button {
+                    isCreatingSpace = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder.badge.plus")
+                            .font(.system(size: 13))
+                            .foregroundColor(subtleText.opacity(0.6))
+                            .frame(width: 20)
+                        Text("Add folder")
+                            .font(.system(size: 13))
+                            .foregroundColor(subtleText.opacity(0.6))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.plain)
             }
-            .listStyle(.sidebar)
+            .padding(.horizontal, 8)
 
-            Divider()
+            Spacer()
 
-            VStack(spacing: 8) {
-                nateToggle
-
-                HStack {
-                    Text("NativeLearn")
-                        .font(.system(size: 11, weight: .medium))
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    statusIndicator
-                }
+            // Footer
+            Divider().opacity(0.5)
+            HStack(spacing: 8) {
+                Image(systemName: "circle.fill")
+                    .font(.system(size: 10))
+                    .foregroundColor(accentOrange)
+                Text("NativeLearn")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(subtleText)
+                Spacer()
+                Circle()
+                    .fill(companionManager.allPermissionsGranted ? Color.green.opacity(0.8) : Color.orange.opacity(0.8))
+                    .frame(width: 7, height: 7)
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.vertical, 12)
         }
+        .background(sidebarBackground)
     }
 
-    private var nateToggle: some View {
-        Toggle(isOn: Binding(
-            get: { companionManager.isNateCursorEnabled },
-            set: { companionManager.setNateCursorEnabled($0) }
-        )) {
-            HStack(spacing: 6) {
-                Image(systemName: "graduationcap.fill")
-                    .font(.system(size: 12))
-                    .foregroundColor(companionManager.isNateCursorEnabled ? .orange : .secondary)
-                Text("Nate")
-                    .font(.system(size: 12, weight: .medium))
-            }
+    private func sidebarRow(item: SidebarItem, icon: String, label: String) -> some View {
+        let isSelected = sidebarSelection == item
+        let isHovered = hoveredSidebarItem == item
+
+        return HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 13))
+                .foregroundColor(isSelected ? .primary : subtleText)
+                .frame(width: 20)
+            Text(label)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .regular))
+                .foregroundColor(isSelected ? .primary : .primary.opacity(0.8))
+                .lineLimit(1)
+            Spacer()
         }
-        .toggleStyle(.switch)
-        .controlSize(.mini)
-    }
-
-    private var statusIndicator: some View {
-        HStack(spacing: 4) {
-            Circle()
-                .fill(statusColor)
-                .frame(width: 6, height: 6)
-            Text(statusLabel)
-                .font(.system(size: 10))
-                .foregroundColor(.secondary)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 7)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(isSelected ? sidebarSelected : (isHovered ? sidebarHover : Color.clear))
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            sidebarSelection = item
+            selectedConversationId = nil
         }
-    }
-
-    private var statusColor: Color {
-        if !companionManager.allPermissionsGranted { return .orange }
-        if companionManager.isNateCursorEnabled { return .green }
-        return Color.secondary.opacity(0.5)
-    }
-
-    private var statusLabel: String {
-        if !companionManager.allPermissionsGranted { return "Setup needed" }
-        if companionManager.isNateCursorEnabled { return "Active" }
-        return "Off"
+        .onHover { hovering in
+            hoveredSidebarItem = hovering ? item : nil
+        }
     }
 
     // MARK: - Detail
@@ -213,38 +239,31 @@ struct MainWindowView: View {
         }()
 
         return VStack(spacing: 0) {
-            headerBar(title: headerTitle)
-
-            if sidebarSelection == .home && !companionManager.isNateCursorEnabled {
-                nateHeroCard
+            // Top bar
+            HStack {
+                Spacer()
             }
+            .frame(height: 52)
 
-            if filteredGroups.isEmpty && (sidebarSelection != .home || companionManager.isNateCursorEnabled) {
+            if filteredGroups.isEmpty {
                 Spacer()
-                VStack(spacing: 12) {
-                    Image(systemName: "bubble.left.and.text.bubble.right")
-                        .font(.system(size: 40))
-                        .foregroundColor(.secondary.opacity(0.5))
+                VStack(spacing: 16) {
+                    Image(systemName: "circle.fill")
+                        .font(.system(size: 36))
+                        .foregroundColor(subtleText.opacity(0.3))
                     Text("No conversations yet")
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundColor(.secondary)
-                    Text("Hold Control + Option to talk to Nate")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundColor(subtleText)
+                    Text("Hold  Control + Option  to talk to Nate")
                         .font(.system(size: 13))
-                        .foregroundColor(.secondary.opacity(0.7))
+                        .foregroundColor(subtleText.opacity(0.6))
                 }
-                Spacer()
-            } else if filteredGroups.isEmpty && sidebarSelection == .home && !companionManager.isNateCursorEnabled {
                 Spacer()
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 0) {
                         ForEach(filteredGroups, id: \.0) { label, convos in
-                            Text(label)
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
-                                .padding(.horizontal, 24)
-                                .padding(.top, 20)
-                                .padding(.bottom, 6)
+                            dateSectionHeader(label)
 
                             ForEach(convos) { conversation in
                                 ConversationRowView(conversation: conversation)
@@ -271,88 +290,27 @@ struct MainWindowView: View {
                             }
                         }
                     }
-                    .padding(.bottom, 20)
+                    .padding(.bottom, 24)
                 }
             }
         }
+        .background(warmBackground)
     }
 
-    private var nateHeroCard: some View {
-        VStack(spacing: 20) {
-            VStack(spacing: 14) {
-                ZStack {
-                    Circle()
-                        .fill(Color.orange.opacity(0.12))
-                        .frame(width: 72, height: 72)
-                    Image(systemName: "graduationcap.fill")
-                        .font(.system(size: 32))
-                        .foregroundColor(.orange)
-                }
-
-                VStack(spacing: 6) {
-                    Text("Meet Nate")
-                        .font(.system(size: 20, weight: .bold))
-                    Text("Your AI tutor that lives on your screen.\nHe'll walk you through any tool, step by step.")
-                        .font(.system(size: 14))
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(2)
-                }
+    private func dateSectionHeader(_ label: String) -> some View {
+        HStack(spacing: 8) {
+            if label == "Today" {
+                Circle()
+                    .fill(accentOrange)
+                    .frame(width: 8, height: 8)
             }
-
-            Button {
-                companionManager.setNateCursorEnabled(true)
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "power")
-                        .font(.system(size: 13, weight: .semibold))
-                    Text("Turn on Nate")
-                        .font(.system(size: 14, weight: .semibold))
-                }
-                .foregroundColor(.white)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 10)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(Color.orange)
-                )
-            }
-            .buttonStyle(.plain)
-
-            Text("Then hold  \(Text("Control + Option").bold())  to talk")
-                .font(.system(size: 12))
-                .foregroundColor(.secondary.opacity(0.7))
+            Text(label)
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(subtleText)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 32)
-        .padding(.horizontal, 24)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(nsColor: .controlBackgroundColor))
-                .shadow(color: .black.opacity(0.06), radius: 8, y: 2)
-        )
-        .padding(.horizontal, 24)
-        .padding(.top, 12)
-    }
-
-    private var headerTitle: String {
-        switch sidebarSelection {
-        case .home: return "Home"
-        case .chat: return "All Conversations"
-        case .space(let id):
-            return conversationStore.spaces.first { $0.id == id }?.name ?? "Space"
-        }
-    }
-
-    private func headerBar(title: String) -> some View {
-        HStack {
-            Text(title)
-                .font(.system(size: 22, weight: .bold))
-            Spacer()
-        }
-        .padding(.horizontal, 24)
-        .padding(.top, 20)
-        .padding(.bottom, 4)
+        .padding(.horizontal, 28)
+        .padding(.top, 24)
+        .padding(.bottom, 8)
     }
 }
 
@@ -360,38 +318,48 @@ struct MainWindowView: View {
 
 struct ConversationRowView: View {
     let conversation: Conversation
+    @State private var isHovered = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .center, spacing: 12) {
             Image(systemName: "doc.text")
                 .font(.system(size: 14))
-                .foregroundColor(.secondary)
-                .frame(width: 20, height: 20)
-                .padding(.top, 2)
+                .foregroundColor(subtleText.opacity(0.5))
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(Color.white.opacity(0.6))
+                )
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(conversation.displayTitle)
                     .font(.system(size: 14, weight: .medium))
                     .lineLimit(1)
                     .foregroundColor(.primary)
-
-                if !conversation.summary.isEmpty {
-                    Text(conversation.summary)
-                        .font(.system(size: 12))
-                        .foregroundColor(.secondary)
-                        .lineLimit(2)
-                }
+                Text("Me")
+                    .font(.system(size: 12))
+                    .foregroundColor(subtleText)
             }
 
             Spacer()
 
-            Text(timeLabel)
-                .font(.system(size: 11))
-                .foregroundColor(.secondary)
+            HStack(spacing: 6) {
+                Image(systemName: "doc.on.clipboard")
+                    .font(.system(size: 11))
+                    .foregroundColor(subtleText.opacity(0.4))
+                Text(timeLabel)
+                    .font(.system(size: 12))
+                    .foregroundColor(subtleText)
+            }
         }
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 28)
         .padding(.vertical, 10)
-        .background(Color.clear)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHovered ? Color.white.opacity(0.5) : Color.clear)
+        )
+        .padding(.horizontal, 8)
+        .onHover { hovering in isHovered = hovering }
     }
 
     private var timeLabel: String {
@@ -399,7 +367,7 @@ struct ConversationRowView: View {
         if Calendar.current.isDateInToday(conversation.updatedAt) {
             formatter.dateFormat = "h:mm"
         } else {
-            formatter.dateFormat = "MMM d"
+            formatter.dateFormat = "h:mm"
         }
         return formatter.string(from: conversation.updatedAt)
     }
@@ -416,23 +384,26 @@ struct ConversationDetailView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            // Top bar with back button
             HStack(spacing: 12) {
                 Button(action: onBack) {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.secondary)
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 12, weight: .semibold))
+                        Image(systemName: "house")
+                            .font(.system(size: 13))
+                    }
+                    .foregroundColor(subtleText)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(Color.white.opacity(0.6))
+                    )
                 }
                 .buttonStyle(.plain)
 
-                Text(conversation.displayTitle)
-                    .font(.system(size: 18, weight: .bold))
-                    .lineLimit(1)
-
                 Spacer()
-
-                Text(dateLabel)
-                    .font(.system(size: 12))
-                    .foregroundColor(.secondary)
 
                 Picker("", selection: $showTranscript) {
                     Text("Summary").tag(false)
@@ -441,99 +412,157 @@ struct ConversationDetailView: View {
                 .pickerStyle(.segmented)
                 .frame(width: 180)
             }
-            .padding(.horizontal, 24)
-            .padding(.vertical, 16)
-
-            Divider()
+            .frame(height: 52)
+            .padding(.horizontal, 28)
 
             ScrollView {
-                if showTranscript {
-                    transcriptView
-                } else {
-                    summaryView
+                VStack(alignment: .leading, spacing: 0) {
+                    // Title
+                    Text(conversation.displayTitle)
+                        .font(.system(size: 26, weight: .bold))
+                        .foregroundColor(.primary)
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 12)
+
+                    // Tags
+                    HStack(spacing: 8) {
+                        tagBadge(icon: "calendar", text: dateLabel)
+                        tagBadge(icon: "person", text: "Me")
+                    }
+                    .padding(.horizontal, 28)
+                    .padding(.bottom, 28)
+
+                    Divider()
+                        .padding(.horizontal, 28)
+                        .padding(.bottom, 20)
+
+                    if showTranscript {
+                        transcriptView
+                    } else {
+                        summaryView
+                    }
                 }
+                .padding(.bottom, 40)
             }
         }
+        .background(warmBackground)
+    }
+
+    private func tagBadge(icon: String, text: String) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 11))
+            Text(text)
+                .font(.system(size: 12, weight: .medium))
+        }
+        .foregroundColor(subtleText)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill(Color.white.opacity(0.6))
+        )
     }
 
     private var summaryView: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            if !conversation.summary.isEmpty {
-                Text(conversation.summary)
+        VStack(alignment: .leading, spacing: 20) {
+            if conversation.summary.isEmpty && conversation.exchanges.isEmpty {
+                Text("No content yet.")
                     .font(.system(size: 14))
+                    .foregroundColor(subtleText)
+                    .padding(.horizontal, 28)
+            } else if !conversation.summary.isEmpty {
+                Text(conversation.summary)
+                    .font(.system(size: 15, design: .default))
                     .foregroundColor(.primary)
-                    .padding(.horizontal, 24)
-                    .padding(.top, 20)
+                    .lineSpacing(4)
+                    .padding(.horizontal, 28)
+            } else {
+                ForEach(conversation.exchanges) { exchange in
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("# \(exchange.userTranscript)")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundColor(.primary)
+                        Text(exchange.assistantResponse)
+                            .font(.system(size: 14))
+                            .foregroundColor(.primary.opacity(0.85))
+                            .lineSpacing(3)
+                    }
+                    .padding(.horizontal, 28)
+                }
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("DETAILS")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.secondary)
-
-                Text("\(conversation.exchanges.count) exchange\(conversation.exchanges.count == 1 ? "" : "s")")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
-
-                Text("Created \(formattedDate(conversation.createdAt))")
-                    .font(.system(size: 13))
-                    .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                Divider().padding(.horizontal, 28)
+                HStack(spacing: 16) {
+                    Label("\(conversation.exchanges.count) exchange\(conversation.exchanges.count == 1 ? "" : "s")", systemImage: "bubble.left.and.bubble.right")
+                    Label(formattedDate(conversation.createdAt), systemImage: "clock")
+                }
+                .font(.system(size: 12))
+                .foregroundColor(subtleText)
+                .padding(.horizontal, 28)
+                .padding(.top, 8)
             }
-            .padding(.horizontal, 24)
-            .padding(.top, 12)
-
-            Spacer()
         }
     }
 
     private var transcriptView: some View {
-        LazyVStack(alignment: .leading, spacing: 20) {
+        VStack(alignment: .leading, spacing: 24) {
             ForEach(conversation.exchanges) { exchange in
-                VStack(alignment: .leading, spacing: 10) {
-                    HStack(alignment: .top, spacing: 10) {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .top, spacing: 12) {
                         Image(systemName: "person.fill")
-                            .font(.system(size: 11))
+                            .font(.system(size: 12))
                             .foregroundColor(.white)
-                            .frame(width: 24, height: 24)
-                            .background(Circle().fill(Color.blue.opacity(0.7)))
+                            .frame(width: 28, height: 28)
+                            .background(Circle().fill(Color.blue.opacity(0.6)))
 
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text("You")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(subtleText)
                             Text(exchange.userTranscript)
                                 .font(.system(size: 14))
                                 .foregroundColor(.primary)
+                                .lineSpacing(3)
                         }
                     }
 
-                    HStack(alignment: .top, spacing: 10) {
-                        Image(systemName: "graduationcap.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(.white)
-                            .frame(width: 24, height: 24)
-                            .background(Circle().fill(Color.orange))
+                    HStack(alignment: .top, spacing: 12) {
+                        Circle()
+                            .fill(accentOrange)
+                            .frame(width: 28, height: 28)
 
-                        VStack(alignment: .leading, spacing: 2) {
+                        VStack(alignment: .leading, spacing: 3) {
                             Text("Nate")
                                 .font(.system(size: 12, weight: .semibold))
-                                .foregroundColor(.secondary)
+                                .foregroundColor(subtleText)
                             Text(exchange.assistantResponse)
                                 .font(.system(size: 14))
                                 .foregroundColor(.primary)
+                                .lineSpacing(3)
                         }
                     }
                 }
+
+                if exchange.id != conversation.exchanges.last?.id {
+                    Divider().padding(.leading, 40)
+                }
             }
         }
-        .padding(.horizontal, 24)
-        .padding(.vertical, 20)
+        .padding(.horizontal, 28)
     }
 
     private var dateLabel: String {
         let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMMM d"
-        return formatter.string(from: conversation.createdAt)
+        if Calendar.current.isDateInToday(conversation.createdAt) {
+            return "Today"
+        } else if Calendar.current.isDateInYesterday(conversation.createdAt) {
+            return "Yesterday"
+        } else {
+            formatter.dateFormat = "EEEE, MMMM d"
+            return formatter.string(from: conversation.createdAt)
+        }
     }
 
     private func formattedDate(_ date: Date) -> String {

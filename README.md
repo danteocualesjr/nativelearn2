@@ -1,6 +1,6 @@
 # NativeLearn
 
-An AI tutor that lives on your Mac. NativeLearn places a companion cursor called **Nate** (an orange graduation cap) right next to your pointer that can see your screen, listen to your voice, and teach you how to use AI tools step by step.
+An AI tutor that lives on your Mac. NativeLearn places a companion cursor called **Nate** (a small orange circle) right next to your pointer that can see your screen, listen to your voice, and teach you how to use AI tools step by step.
 
 ## What it does
 

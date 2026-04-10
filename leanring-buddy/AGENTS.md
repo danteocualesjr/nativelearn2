@@ -20,7 +20,7 @@
   - Status indicator showing Active/Off/Setup needed
 - `ConversationRowView` — Row displaying conversation title, summary, and time
 - `ConversationDetailView` — Shows conversation summary or full transcript with Summary/Transcript picker
-  - Transcript shows user messages (blue avatar) and Nate responses (orange graduation cap avatar)
+  - Transcript shows user messages (blue avatar) and Nate responses (orange circle avatar)
 
 ### ConversationStore.swift
 - `ConversationExchange` — Single user-transcript + assistant-response pair with timestamp
@@ -45,13 +45,13 @@
 
 ### MenuBarPanelManager.swift
 - `MenuBarPanelManager` — `@MainActor` class for menu bar status item
-  - Menu bar icon: `graduationcap.fill` SF Symbol (template mode)
+  - Menu bar icon: `circle.fill` SF Symbol (template mode)
   - Floating `NSPanel` for companion controls
   - Panel is draggable (`isMovableByWindowBackground = true`)
 
 ### OverlayWindow.swift
 - Full-screen transparent overlay hosting the cursor companion
-- Graduation cap icon (`Image(systemName: "graduationcap.fill")`) with orange color and glow shadow
+- Small orange filled circle with glow shadow
 - Waveform view replaces cap while listening
 - Spinner replaces cap while processing
 - Bezier arc flight animations for element pointing
