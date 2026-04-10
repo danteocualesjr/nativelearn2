@@ -31,6 +31,9 @@ final class CompanionManager: ObservableObject {
     @Published private(set) var hasMicrophonePermission = false
     @Published private(set) var hasScreenContentPermission = false
 
+    /// Set by the app delegate so conversations are auto-saved to disk.
+    var conversationStore: ConversationStore?
+
     /// Screen location (global AppKit coords) of a detected UI element the
     /// buddy should fly to and point at. Parsed from Claude's response;
     /// observed by BlueCursorView to trigger the flight animation.
@@ -71,8 +74,8 @@ final class CompanionManager: ObservableObject {
     /// Base URL for the Cloudflare Worker proxy. All API requests route
     /// through this so keys never ship in the app binary.
     /// TODO: Replace with your deployed Cloudflare Worker URL after running `wrangler deploy`
-    /// Example: "https://nativelearn-proxy.your-subdomain.workers.dev"
-    private static let workerBaseURL = "https://nativelearn-proxy.your-subdomain.workers.dev"
+    /// Example: "https://nativelearn-proxy.danteocualesjr.workers.dev"
+    private static let workerBaseURL = "https://nativelearn-proxy.danteocualesjr.workers.dev"
 
     private lazy var claudeAPI: ClaudeAPI = {
         return ClaudeAPI(proxyURL: "\(Self.workerBaseURL)/chat", model: selectedModel)
@@ -122,7 +125,7 @@ final class CompanionManager: ObservableObject {
     /// When toggled off, the overlay is hidden and push-to-talk is disabled.
     /// Persisted to UserDefaults so the choice survives app restarts.
     @Published var isNateCursorEnabled: Bool = UserDefaults.standard.object(forKey: "isNateCursorEnabled") == nil
-        ? true
+        ? false
         : UserDefaults.standard.bool(forKey: "isNateCursorEnabled")
 
     func setNateCursorEnabled(_ enabled: Bool) {
@@ -475,8 +478,8 @@ final class CompanionManager: ObservableObject {
     private func handleShortcutTransition(_ transition: BuddyPushToTalkShortcut.ShortcutTransition) {
         switch transition {
         case .pressed:
+            print("🎤 Push-to-talk: shortcut pressed (dictationInProgress: \(buddyDictationManager.isDictationInProgress), onboardingVideo: \(showOnboardingVideo))")
             guard !buddyDictationManager.isDictationInProgress else { return }
-            // Don't register push-to-talk while the onboarding video is playing
             guard !showOnboardingVideo else { return }
 
             // Cancel any pending transient hide so the overlay stays visible
@@ -567,7 +570,7 @@ final class CompanionManager: ObservableObject {
     - if you receive multiple screen images, the one labeled "primary focus" is where the cursor is — prioritize that one but reference others if relevant.
 
     element pointing:
-    you have a small blue triangle cursor that can fly to and point at things on screen. as a tutor, pointing is your most powerful teaching tool — use it liberally. whenever you're telling the user to click something, look at something, or navigate somewhere, point at it. this makes your tutorials feel like having a real teacher sitting next to them.
+    you have a small orange graduation cap icon that can fly to and point at things on screen. as a tutor, pointing is your most powerful teaching tool — use it liberally. whenever you're telling the user to click something, look at something, or navigate somewhere, point at it. this makes your tutorials feel like having a real teacher sitting next to them.
 
     always point when: guiding through UI, showing where buttons are, teaching navigation, demonstrating workflows, helping find menus or settings.
 
@@ -691,17 +694,19 @@ final class CompanionManager: ObservableObject {
                     print("🎯 Element pointing: \(parseResult.elementLabel ?? "no element")")
                 }
 
-                // Save this exchange to conversation history (with the point tag
-                // stripped so it doesn't confuse future context)
                 conversationHistory.append((
                     userTranscript: transcript,
                     assistantResponse: spokenText
                 ))
 
-                // Keep only the last 10 exchanges to avoid unbounded context growth
                 if conversationHistory.count > 10 {
                     conversationHistory.removeFirst(conversationHistory.count - 10)
                 }
+
+                conversationStore?.appendExchange(
+                    userTranscript: transcript,
+                    assistantResponse: spokenText
+                )
 
                 print("🧠 Conversation history: \(conversationHistory.count) exchanges")
 
@@ -834,59 +839,10 @@ final class CompanionManager: ObservableObject {
 
     // MARK: - Onboarding Video
 
-    /// Sets up the onboarding video player, starts playback, and schedules
-    /// the demo interaction at 40s. Called by BlueCursorView when onboarding starts.
+    /// Called by BlueCursorView after the welcome text disappears.
+    /// Skips straight to showing the onboarding prompt with usage instructions.
     func setupOnboardingVideo() {
-        guard let videoURL = URL(string: "https://stream.mux.com/e5jB8UuSrtFABVnTHCR7k3sIsmcUHCyhtLu1tzqLlfs.m3u8") else { return }
-
-        let player = AVPlayer(url: videoURL)
-        player.isMuted = false
-        player.volume = 0.0
-        self.onboardingVideoPlayer = player
-        self.showOnboardingVideo = true
-        self.onboardingVideoOpacity = 0.0
-
-        // Start playback immediately — the video plays while invisible,
-        // then we fade in both the visual and audio over 1s.
-        player.play()
-
-        // Wait for SwiftUI to mount the view, then set opacity to 1.
-        // The .animation modifier on the view handles the actual animation.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            self.onboardingVideoOpacity = 1.0
-            // Fade audio volume from 0 → 1 over 2s to match visual fade
-            self.fadeInVideoAudio(player: player, targetVolume: 1.0, duration: 2.0)
-        }
-
-        // At 40 seconds into the video, trigger the onboarding demo where
-        // Nate flies to something interesting on screen and comments on it
-        let demoTriggerTime = CMTime(seconds: 40, preferredTimescale: 600)
-        onboardingDemoTimeObserver = player.addBoundaryTimeObserver(
-            forTimes: [NSValue(time: demoTriggerTime)],
-            queue: .main
-        ) { [weak self] in
-            NativeLearnAnalytics.trackOnboardingDemoTriggered()
-            self?.performOnboardingDemoInteraction()
-        }
-
-        // Fade out and clean up when the video finishes
-        onboardingVideoEndObserver = NotificationCenter.default.addObserver(
-            forName: AVPlayerItem.didPlayToEndTimeNotification,
-            object: player.currentItem,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self else { return }
-            NativeLearnAnalytics.trackOnboardingVideoCompleted()
-            self.onboardingVideoOpacity = 0.0
-            // Wait for the 2s fade-out animation to complete before tearing down
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.tearDownOnboardingVideo()
-                // After the video disappears, stream in the prompt to try talking
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    self.startOnboardingPromptStream()
-                }
-            }
-        }
+        startOnboardingPromptStream()
     }
 
     func tearDownOnboardingVideo() {
@@ -904,7 +860,7 @@ final class CompanionManager: ObservableObject {
     }
 
     private func startOnboardingPromptStream() {
-        let message = "press control + option and ask nate to teach you something"
+        let message = "hold control + option to talk to me. try asking me to teach you something!"
         onboardingPromptText = ""
         showOnboardingPrompt = true
         onboardingPromptOpacity = 0.0
@@ -958,7 +914,7 @@ final class CompanionManager: ObservableObject {
     // MARK: - Onboarding Demo Interaction
 
     private static let onboardingDemoSystemPrompt = """
-    you're nate, a small blue cursor buddy and AI tutor living on the user's screen. you're showing off during onboarding — look at their screen and find ONE specific, concrete thing to point at. pick something with a clear name or identity: a specific app icon (say its name), a specific word or phrase of text you can read, a specific filename, a specific button label, a specific tab title, a specific image you can describe. do NOT point at vague things like "a window" or "some text" — be specific about exactly what you see.
+    you're nate, a small orange graduation cap buddy and AI tutor living on the user's screen. you're showing off during onboarding — look at their screen and find ONE specific, concrete thing to point at. pick something with a clear name or identity: a specific app icon (say its name), a specific word or phrase of text you can read, a specific filename, a specific button label, a specific tab title, a specific image you can describe. do NOT point at vague things like "a window" or "some text" — be specific about exactly what you see.
 
     make a short quirky 3-6 word observation about the specific thing you picked — something fun, playful, or curious that shows you actually read/recognized it. no emojis ever. NEVER quote or repeat text you see on screen — just react to it. keep it to 6 words max, no exceptions.
 

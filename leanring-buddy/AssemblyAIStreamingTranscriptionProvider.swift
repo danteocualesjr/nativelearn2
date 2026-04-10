@@ -20,7 +20,7 @@ final class AssemblyAIStreamingTranscriptionProvider: BuddyTranscriptionProvider
     /// URL for the Cloudflare Worker endpoint that returns a short-lived
     /// AssemblyAI streaming token. The real API key never leaves the server.
     /// TODO: Replace with your deployed Cloudflare Worker URL after running `wrangler deploy`
-    private static let tokenProxyURL = "https://nativelearn-proxy.your-subdomain.workers.dev/transcribe-token"
+    private static let tokenProxyURL = "https://nativelearn-proxy.danteocualesjr.workers.dev/transcribe-token"
 
     let displayName = "AssemblyAI"
     let requiresSpeechRecognitionPermission = false

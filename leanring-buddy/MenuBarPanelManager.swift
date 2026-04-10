@@ -65,7 +65,7 @@ final class MenuBarPanelManager: NSObject {
 
         guard let button = statusItem?.button else { return }
 
-        button.image = makeNativeLearnMenuBarIcon()
+        button.image = NSImage(systemSymbolName: "graduationcap.fill", accessibilityDescription: "NativeLearn")
         button.image?.isTemplate = true
         button.action = #selector(statusItemClicked)
         button.target = self
@@ -167,7 +167,7 @@ final class MenuBarPanelManager: NSObject {
         menuBarPanel.hidesOnDeactivate = false
         menuBarPanel.isExcludedFromWindowsMenu = true
         menuBarPanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        menuBarPanel.isMovableByWindowBackground = false
+        menuBarPanel.isMovableByWindowBackground = true
         menuBarPanel.titleVisibility = .hidden
         menuBarPanel.titlebarAppearsTransparent = true
 

@@ -1,6 +1,6 @@
 # NativeLearn
 
-An AI tutor that lives on your Mac. NativeLearn places a companion cursor (Nate) right next to your pointer that can see your screen, listen to your voice, and teach you how to use AI tools step by step.
+An AI tutor that lives on your Mac. NativeLearn places a companion cursor called **Nate** (an orange graduation cap) right next to your pointer that can see your screen, listen to your voice, and teach you how to use AI tools step by step.
 
 ## What it does
 
@@ -9,6 +9,9 @@ An AI tutor that lives on your Mac. NativeLearn places a companion cursor (Nate)
 - **Voice Conversation**: Hold Control+Option to talk to Nate naturally
 - **Cursor Pointing**: Nate flies to and points at relevant buttons, menus, and UI elements to guide you
 - **Step-by-Step**: Nate walks you through tutorials conversationally, asking what you want to build
+- **Desktop App**: Full window with sidebar navigation, conversation history grouped by date, and Spaces (folders) for organizing sessions
+- **Nate Toggle**: Turn Nate on/off from the desktop app — he's off by default so you can explore the app first
+- **Conversation History**: Every voice session is saved as a summary and full transcript
 
 ## Prerequisites
 
@@ -43,7 +46,7 @@ Note the worker URL (e.g., `https://nativelearn-proxy.<your-subdomain>.workers.d
 
 ### 2. Update the Worker URL in Swift
 
-In `CompanionManager.swift`, replace the `workerBaseURL` placeholder with your deployed worker URL.
+In `CompanionManager.swift`, replace the `workerBaseURL` with your deployed worker URL.
 
 ### 3. Build and Run
 
@@ -58,9 +61,12 @@ open leanring-buddy.xcodeproj
 
 ## Usage
 
-1. Hold **Control + Option** to activate push-to-talk
-2. Ask Nate something like: "Hey Nate, I want to learn how to use Cursor. Can you show me?"
-3. Nate will see your screen, talk back to you, and point at relevant UI elements
+1. Open NativeLearn — the desktop app window appears with a "Meet Nate" hero card
+2. Click **Turn on Nate** to activate the companion cursor, or use the toggle in the sidebar
+3. Hold **Control + Option** to activate push-to-talk
+4. Ask Nate something like: "Hey Nate, I want to learn how to use Cursor. Can you show me?"
+5. Nate will see your screen, talk back to you, and point at relevant UI elements
+6. Your conversations are automatically saved — find them in the desktop app grouped by date
 
 ## Based on
 

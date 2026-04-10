@@ -1,25 +1,49 @@
-# Clicky - Agent Instructions
+# NativeLearn - Agent Instructions
 
 <!-- This is the single source of truth for all AI coding agents. CLAUDE.md is a symlink to this file. -->
 <!-- AGENTS.md spec: https://github.com/agentsmd/agents.md — supported by Claude Code, Cursor, Copilot, Gemini CLI, and others. -->
 
 ## Overview
 
-macOS menu bar companion app. Lives entirely in the macOS status bar (no dock icon, no main window). Clicking the menu bar icon opens a custom floating panel with companion voice controls. Uses push-to-talk (ctrl+option) to capture voice input, transcribes it via AssemblyAI streaming, and sends the transcript + a screenshot of the user's screen to Claude. Claude responds with text (streamed via SSE) and voice (ElevenLabs TTS). A blue cursor overlay can fly to and point at UI elements Claude references on any connected monitor.
+NativeLearn is a macOS AI tutor that helps users become AI-native. It places a companion cursor called **Nate** (an orange graduation cap icon) next to the user's mouse pointer. Nate can see the user's screen, respond to voice commands, and walk them through how to use AI tools like Replit, Cursor, Claude Code, and Codex — step by step, conversationally.
 
-All API keys live on a Cloudflare Worker proxy — nothing sensitive ships in the app.
+The app has two main surfaces:
+1. **Desktop window** — A full-size window with sidebar navigation, conversation history, and a Nate on/off toggle. This is what the user sees on launch.
+2. **Cursor overlay** — A transparent full-screen overlay hosting Nate's graduation cap icon, which follows the user's mouse and can fly to and point at UI elements.
+
+Push-to-talk (Control+Option) captures voice, transcribes it, sends it with a screenshot to Claude, and Nate responds with voice (ElevenLabs TTS) while pointing at relevant screen elements.
+
+All API keys live on a Cloudflare Worker proxy — nothing sensitive ships in the app binary.
+
+### Forked From
+
+Built on top of [Clicky](https://github.com/farzaa/clicky) by Farza. Major changes from the original:
+
+- Rebranded from "Clicky" to "NativeLearn" with AI tutor persona "Nate"
+- Changed companion icon from blue triangle to orange graduation cap (`graduationcap.fill` SF Symbol)
+- Changed from menu-bar-only app to full desktop app with main window (`LSUIElement=false`)
+- Added persistent conversation storage (JSON files in Application Support)
+- Added desktop window with sidebar navigation (Home, Chat, Spaces) and conversation history
+- Added Nate on/off toggle — Nate is off by default, user activates from the desktop app
+- Changed TTS voice from female to male (ElevenLabs "Adam" voice: `pNInz6obpgDQGcFmaJgB`)
+- Removed Sparkle auto-update framework
+- Removed onboarding video, replaced with text-based instructions
+- Made menu bar panel draggable
+- Updated system prompts for Nate's AI tutor persona
 
 ## Architecture
 
-- **App Type**: Menu bar-only (`LSUIElement=true`), no dock icon or main window
+- **App Type**: Desktop app with main window + menu bar status item (`LSUIElement=false`)
 - **Framework**: SwiftUI (macOS native) with AppKit bridging for menu bar panel and cursor overlay
-- **Pattern**: MVVM with `@StateObject` / `@Published` state management
+- **Pattern**: MVVM with `@StateObject` / `@ObservedObject` / `@Published` state management
 - **AI Chat**: Claude (Sonnet 4.6 default, Opus 4.6 optional) via Cloudflare Worker proxy with SSE streaming
 - **Speech-to-Text**: AssemblyAI real-time streaming (`u3-rt-pro` model) via websocket, with OpenAI and Apple Speech as fallbacks
-- **Text-to-Speech**: ElevenLabs (`eleven_flash_v2_5` model) via Cloudflare Worker proxy
+- **Text-to-Speech**: ElevenLabs (`eleven_flash_v2_5` model, male "Adam" voice) via Cloudflare Worker proxy
 - **Screen Capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
-- **Voice Input**: Push-to-talk via `AVAudioEngine` + pluggable transcription-provider layer. System-wide keyboard shortcut via listen-only CGEvent tap.
-- **Element Pointing**: Claude embeds `[POINT:x,y:label:screenN]` tags in responses. The overlay parses these, maps coordinates to the correct monitor, and animates the blue cursor along a bezier arc to the target.
+- **Voice Input**: Push-to-talk (Control+Option) via `AVAudioEngine` + pluggable transcription-provider layer. System-wide keyboard shortcut via listen-only CGEvent tap.
+- **Companion Icon**: Orange graduation cap (`graduationcap.fill` SF Symbol) — used in cursor overlay, menu bar, and transcript UI
+- **Element Pointing**: Claude embeds `[POINT:x,y:label:screenN]` tags in responses. The overlay parses these, maps coordinates to the correct monitor, and animates the graduation cap along a bezier arc to the target.
+- **Conversation Persistence**: JSON files in `~/Library/Application Support/NativeLearn/`. Conversations are auto-saved during voice interactions and grouped by date in the UI.
 - **Concurrency**: `@MainActor` isolation, async/await throughout
 - **Analytics**: PostHog via `ClickyAnalytics.swift`
 
@@ -34,34 +58,40 @@ The app never calls external APIs directly. All requests go through a Cloudflare
 | `POST /transcribe-token` | `streaming.assemblyai.com/v3/token` | Fetches a short-lived (480s) AssemblyAI websocket token |
 
 Worker secrets: `ANTHROPIC_API_KEY`, `ASSEMBLYAI_API_KEY`, `ELEVENLABS_API_KEY`
-Worker vars: `ELEVENLABS_VOICE_ID`
+Worker vars: `ELEVENLABS_VOICE_ID` (set to `pNInz6obpgDQGcFmaJgB` — Adam male voice)
 
 ### Key Architecture Decisions
 
-**Menu Bar Panel Pattern**: The companion panel uses `NSStatusItem` for the menu bar icon and a custom borderless `NSPanel` for the floating control panel. This gives full control over appearance (dark, rounded corners, custom shadow) and avoids the standard macOS menu/popover chrome. The panel is non-activating so it doesn't steal focus. A global event monitor auto-dismisses it on outside clicks.
+**Desktop Window + Menu Bar**: The app launches with a full `WindowGroup` containing `MainWindowView` (sidebar + detail). The menu bar status item with graduation cap icon remains as a secondary access point. `LSUIElement` is `false` so the app appears in the Dock.
 
-**Cursor Overlay**: A full-screen transparent `NSPanel` hosts the blue cursor companion. It's non-activating, joins all Spaces, and never steals focus. The cursor position, response text, waveform, and pointing animations all render in this overlay via SwiftUI through `NSHostingView`.
+**Nate Toggle**: `CompanionManager.isNateCursorEnabled` controls whether the cursor overlay is visible. Defaults to `false` — the desktop app shows first, and the user activates Nate via a toggle in the sidebar or a hero card on the Home view. The preference is persisted to `UserDefaults`. Even when Nate is off, pressing Control+Option temporarily brings the overlay back for that interaction (transient cursor mode).
+
+**Conversation Storage**: `ConversationStore` saves conversations as JSON to `~/Library/Application Support/NativeLearn/`. Each voice interaction (user transcript + Nate response) is appended to the active conversation. Conversations have titles (auto-generated from the first user message), summaries, and can be organized into Spaces (folders). The store is injected into both `MainWindowView` and `CompanionManager` from the app delegate.
+
+**Menu Bar Panel Pattern**: The companion panel uses `NSStatusItem` for the menu bar icon and a custom borderless `NSPanel` for the floating control panel. The panel is non-activating so it doesn't steal focus. A global event monitor auto-dismisses it on outside clicks. The panel is draggable (`isMovableByWindowBackground = true`).
+
+**Cursor Overlay**: A full-screen transparent `NSPanel` hosts the graduation cap companion. It's non-activating, joins all Spaces, and never steals focus. The cursor position, response text, waveform, and pointing animations all render in this overlay via SwiftUI through `NSHostingView`.
 
 **Global Push-To-Talk Shortcut**: Background push-to-talk uses a listen-only `CGEvent` tap instead of an AppKit global monitor so modifier-based shortcuts like `ctrl + option` are detected more reliably while the app is running in the background.
 
 **Shared URLSession for AssemblyAI**: A single long-lived `URLSession` is shared across all AssemblyAI streaming sessions (owned by the provider, not the session). Creating and invalidating a URLSession per session corrupts the OS connection pool and causes "Socket is not connected" errors after a few rapid reconnections.
 
-**Transient Cursor Mode**: When "Show Clicky" is off, pressing the hotkey fades in the cursor overlay for the duration of the interaction (recording → response → TTS → optional pointing), then fades it out automatically after 1 second of inactivity.
-
 ## Key Files
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `leanring_buddyApp.swift` | ~89 | Menu bar app entry point. Uses `@NSApplicationDelegateAdaptor` with `CompanionAppDelegate` which creates `MenuBarPanelManager` and starts `CompanionManager`. No main window — the app lives entirely in the status bar. |
-| `CompanionManager.swift` | ~1026 | Central state machine. Owns dictation, shortcut monitoring, screen capture, Claude API, ElevenLabs TTS, and overlay management. Tracks voice state (idle/listening/processing/responding), conversation history, model selection, and cursor visibility. Coordinates the full push-to-talk → screenshot → Claude → TTS → pointing pipeline. |
-| `MenuBarPanelManager.swift` | ~243 | NSStatusItem + custom NSPanel lifecycle. Creates the menu bar icon, manages the floating companion panel (show/hide/position), installs click-outside-to-dismiss monitor. |
+| `leanring_buddyApp.swift` | ~70 | App entry point. `WindowGroup` displays `MainWindowView`. `CompanionAppDelegate` creates `CompanionManager`, `ConversationStore`, and `MenuBarPanelManager`, then starts the companion pipeline on launch. |
+| `CompanionManager.swift` | ~992 | Central state machine. Owns dictation, shortcut monitoring, screen capture, Claude API, ElevenLabs TTS, overlay management, and Nate on/off toggle (`isNateCursorEnabled`). Coordinates the full push-to-talk → screenshot → Claude → TTS → pointing pipeline. Auto-saves voice exchanges to `ConversationStore`. |
+| `MainWindowView.swift` | ~544 | Primary desktop window UI. `NavigationSplitView` with sidebar (search, Home, Chat, Spaces) and detail pane (conversation list grouped by date, or conversation detail view). Includes Nate on/off toggle in sidebar footer and a hero card on the Home view when Nate is off. |
+| `ConversationStore.swift` | ~248 | Persistent conversation storage. Data models: `ConversationExchange`, `Conversation`, `Space`. Saves/loads JSON in `~/Library/Application Support/NativeLearn/`. Groups conversations by date. Supports Spaces (folders) for organizing conversations. |
+| `MenuBarPanelManager.swift` | ~243 | NSStatusItem + custom NSPanel lifecycle. Creates the graduation cap menu bar icon, manages the floating companion panel (show/hide/position), installs click-outside-to-dismiss monitor. Panel is draggable. |
 | `CompanionPanelView.swift` | ~761 | SwiftUI panel content for the menu bar dropdown. Shows companion status, push-to-talk instructions, model picker (Sonnet/Opus), permissions UI, DM feedback button, and quit button. Dark aesthetic using `DS` design system. |
-| `OverlayWindow.swift` | ~881 | Full-screen transparent overlay hosting the blue cursor, response text, waveform, and spinner. Handles cursor animation, element pointing with bezier arcs, multi-monitor coordinate mapping, and fade-out transitions. |
+| `OverlayWindow.swift` | ~872 | Full-screen transparent overlay hosting the graduation cap cursor, response text, waveform, and spinner. Handles cursor animation, element pointing with bezier arcs, multi-monitor coordinate mapping, and fade-out transitions. |
 | `CompanionResponseOverlay.swift` | ~217 | SwiftUI view for the response text bubble and waveform displayed next to the cursor in the overlay. |
 | `CompanionScreenCaptureUtility.swift` | ~132 | Multi-monitor screenshot capture using ScreenCaptureKit. Returns labeled image data for each connected display. |
 | `BuddyDictationManager.swift` | ~866 | Push-to-talk voice pipeline. Handles microphone capture via `AVAudioEngine`, provider-aware permission checks, keyboard/button dictation sessions, transcript finalization, shortcut parsing, contextual keyterms, and live audio-level reporting for waveform feedback. |
 | `BuddyTranscriptionProvider.swift` | ~100 | Protocol surface and provider factory for voice transcription backends. Resolves provider based on `VoiceTranscriptionProvider` in Info.plist — AssemblyAI, OpenAI, or Apple Speech. |
-| `AssemblyAIStreamingTranscriptionProvider.swift` | ~478 | Streaming transcription provider. Fetches temp tokens from the Cloudflare Worker, opens an AssemblyAI v3 websocket, streams PCM16 audio, tracks turn-based transcripts, and delivers finalized text on key-up. Shares a single URLSession across all sessions. |
+| `AssemblyAIStreamingTranscriptionProvider.swift` | ~479 | Streaming transcription provider. Fetches temp tokens from the Cloudflare Worker, opens an AssemblyAI v3 websocket, streams PCM16 audio, tracks turn-based transcripts, and delivers finalized text on key-up. Shares a single URLSession across all sessions. |
 | `OpenAIAudioTranscriptionProvider.swift` | ~317 | Upload-based transcription provider. Buffers push-to-talk audio locally, uploads as WAV on release, returns finalized transcript. |
 | `AppleSpeechTranscriptionProvider.swift` | ~147 | Local fallback transcription provider backed by Apple's Speech framework. |
 | `BuddyAudioConversionSupport.swift` | ~108 | Audio conversion helpers. Converts live mic buffers to PCM16 mono audio and builds WAV payloads for upload-based providers. |
@@ -70,8 +100,8 @@ Worker vars: `ELEVENLABS_VOICE_ID`
 | `OpenAIAPI.swift` | ~142 | OpenAI GPT vision API client. |
 | `ElevenLabsTTSClient.swift` | ~81 | ElevenLabs TTS client. Sends text to the Worker proxy, plays back audio via `AVAudioPlayer`. Exposes `isPlaying` for transient cursor scheduling. |
 | `ElementLocationDetector.swift` | ~335 | Detects UI element locations in screenshots for cursor pointing. |
-| `DesignSystem.swift` | ~880 | Design system tokens — colors, corner radii, shared styles. All UI references `DS.Colors`, `DS.CornerRadius`, etc. |
-| `ClickyAnalytics.swift` | ~121 | PostHog analytics integration for usage tracking. |
+| `DesignSystem.swift` | ~879 | Design system tokens — colors, corner radii, shared styles. All UI references `DS.Colors`, `DS.CornerRadius`, etc. `overlayCursorBlue` is actually orange (`#FF8C33`). |
+| `ClickyAnalytics.swift` | ~122 | PostHog analytics integration for usage tracking. |
 | `WindowPositionManager.swift` | ~262 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
 | `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader for keys stored in the app bundle Info.plist. |
 | `worker/src/index.ts` | ~142 | Cloudflare Worker proxy. Three routes: `/chat` (Claude), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). |
@@ -91,6 +121,8 @@ open leanring-buddy.xcodeproj
 **Do NOT run `xcodebuild` from the terminal** — it invalidates TCC (Transparency, Consent, and Control) permissions and the app will need to re-request screen recording, accessibility, etc.
 
 ## Cloudflare Worker
+
+The deployed worker URL is `https://nativelearn-proxy.danteocualesjr.workers.dev`.
 
 ```bash
 cd worker

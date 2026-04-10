@@ -9,29 +9,29 @@
 
 import ServiceManagement
 import SwiftUI
-import Sparkle
 
 @main
 struct leanring_buddyApp: App {
     @NSApplicationDelegateAdaptor(CompanionAppDelegate.self) var appDelegate
 
     var body: some Scene {
-        // The app lives entirely in the menu bar panel managed by the AppDelegate.
-        // This empty Settings scene satisfies SwiftUI's requirement for at least
-        // one scene but is never shown (LSUIElement=true removes the app menu).
-        Settings {
-            EmptyView()
+        WindowGroup {
+            MainWindowView(
+                conversationStore: appDelegate.conversationStore,
+                companionManager: appDelegate.companionManager
+            )
+            .frame(minWidth: 800, minHeight: 550)
         }
+        .windowStyle(.titleBar)
+        .defaultSize(width: 1000, height: 650)
     }
 }
 
-/// Manages the companion lifecycle: creates the menu bar panel and starts
-/// the companion voice pipeline on launch.
 @MainActor
 final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarPanelManager: MenuBarPanelManager?
-    private let companionManager = CompanionManager()
-    private var sparkleUpdaterController: SPUStandardUpdaterController?
+    let companionManager = CompanionManager()
+    let conversationStore = ConversationStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         print("🎯 NativeLearn: Starting...")
@@ -42,24 +42,20 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
         NativeLearnAnalytics.configure()
         NativeLearnAnalytics.trackAppOpened()
 
+        companionManager.conversationStore = conversationStore
+
         menuBarPanelManager = MenuBarPanelManager(companionManager: companionManager)
         companionManager.start()
-        // Auto-open the panel if the user still needs to do something:
-        // either they haven't onboarded yet, or permissions were revoked.
         if !companionManager.hasCompletedOnboarding || !companionManager.allPermissionsGranted {
             menuBarPanelManager?.showPanelOnLaunch()
         }
         registerAsLoginItemIfNeeded()
-        // startSparkleUpdater()
     }
 
     func applicationWillTerminate(_ notification: Notification) {
         companionManager.stop()
     }
 
-    /// Registers the app as a login item so it launches automatically on
-    /// startup. Uses SMAppService which shows the app in System Settings >
-    /// General > Login Items, letting the user toggle it off if they want.
     private func registerAsLoginItemIfNeeded() {
         let loginItemService = SMAppService.mainApp
         if loginItemService.status != .enabled {
@@ -69,21 +65,6 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
             } catch {
                 print("⚠️ NativeLearn: Failed to register as login item: \(error)")
             }
-        }
-    }
-
-    private func startSparkleUpdater() {
-        let updaterController = SPUStandardUpdaterController(
-            startingUpdater: false,
-            updaterDelegate: nil,
-            userDriverDelegate: nil
-        )
-        self.sparkleUpdaterController = updaterController
-
-        do {
-            try updaterController.updater.start()
-        } catch {
-            print("⚠️ NativeLearn: Sparkle updater failed to start: \(error)")
         }
     }
 }
