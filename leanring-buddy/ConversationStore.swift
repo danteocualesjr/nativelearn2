@@ -2,14 +2,41 @@
 //  ConversationStore.swift
 //  leanring-buddy
 //
-//  Persistent storage for voice conversations between the user and Nate.
+//  Persistent storage for voice conversations between the user and Sparkle.
 //  Each conversation is a session (from first push-to-talk to last),
-//  containing multiple exchanges (user transcript + Nate response).
+//  containing multiple exchanges (user transcript + Sparkle response).
 //  Stored as JSON files in ~/Library/Application Support/Vibecademy/.
 //
 
 import Combine
 import Foundation
+
+// MARK: - Tool Type
+
+enum ConversationToolType: String, Codable, CaseIterable {
+    case mobileApp = "mobile_app"
+    case webApp = "web_app"
+    case internalTool = "internal_tool"
+    case aiAgent = "ai_agent"
+
+    var displayName: String {
+        switch self {
+        case .mobileApp: return "Mobile App"
+        case .webApp: return "Web App"
+        case .internalTool: return "Internal Tool"
+        case .aiAgent: return "AI Agent"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .mobileApp: return "iphone"
+        case .webApp: return "globe"
+        case .internalTool: return "rectangle.3.group"
+        case .aiAgent: return "cpu"
+        }
+    }
+}
 
 struct ConversationExchange: Codable, Identifiable {
     let id: UUID
@@ -30,18 +57,28 @@ struct Conversation: Codable, Identifiable {
     var title: String
     var summary: String
     var spaceId: UUID?
+    var toolType: ConversationToolType?
+    var isArchived: Bool?
     var exchanges: [ConversationExchange]
     let createdAt: Date
     var updatedAt: Date
 
-    init(title: String = "", summary: String = "", spaceId: UUID? = nil) {
+    init(title: String = "", summary: String = "", spaceId: UUID? = nil, toolType: ConversationToolType? = nil) {
         self.id = UUID()
         self.title = title
         self.summary = summary
         self.spaceId = spaceId
+        self.toolType = toolType
+        self.isArchived = false
         self.exchanges = []
         self.createdAt = Date()
         self.updatedAt = Date()
+    }
+
+    var archived: Bool { isArchived ?? false }
+
+    var resolvedToolType: ConversationToolType {
+        toolType ?? .webApp
     }
 
     var displayTitle: String {
@@ -131,6 +168,14 @@ final class ConversationStore: ObservableObject {
         save()
     }
 
+    func updateConversation(_ conversationId: UUID, title: String, summary: String, toolType: ConversationToolType) {
+        guard let idx = conversations.firstIndex(where: { $0.id == conversationId }) else { return }
+        conversations[idx].title = title
+        conversations[idx].summary = summary
+        conversations[idx].toolType = toolType
+        save()
+    }
+
     func endCurrentConversation() {
         activeConversationId = nil
     }
@@ -146,6 +191,21 @@ final class ConversationStore: ObservableObject {
     func moveConversation(_ conversationId: UUID, toSpace spaceId: UUID?) {
         guard let idx = conversations.firstIndex(where: { $0.id == conversationId }) else { return }
         conversations[idx].spaceId = spaceId
+        save()
+    }
+
+    func archiveConversation(_ conversationId: UUID) {
+        guard let idx = conversations.firstIndex(where: { $0.id == conversationId }) else { return }
+        conversations[idx].isArchived = true
+        if activeConversationId == conversationId {
+            activeConversationId = nil
+        }
+        save()
+    }
+
+    func unarchiveConversation(_ conversationId: UUID) {
+        guard let idx = conversations.firstIndex(where: { $0.id == conversationId }) else { return }
+        conversations[idx].isArchived = false
         save()
     }
 
@@ -168,9 +228,10 @@ final class ConversationStore: ObservableObject {
     // MARK: - Grouping
 
     func conversationsGroupedByDate(spaceId: UUID? = nil) -> [(String, [Conversation])] {
-        let filtered = spaceId == nil
+        let filtered = (spaceId == nil
             ? conversations
-            : conversations.filter { $0.spaceId == spaceId }
+            : conversations.filter { $0.spaceId == spaceId })
+            .filter { !$0.archived }
 
         let sorted = filtered.sorted { $0.updatedAt > $1.updatedAt }
         let calendar = Calendar.current
@@ -217,18 +278,27 @@ final class ConversationStore: ObservableObject {
         conversations.filter { $0.spaceId == spaceId }
     }
 
+    // MARK: - Reload
+
+    func reload() {
+        loadAll()
+    }
+
     // MARK: - Persistence
 
     private var conversationsURL: URL { storageDirectory.appendingPathComponent("conversations.json") }
     private var spacesURL: URL { storageDirectory.appendingPathComponent("spaces.json") }
 
     private func loadAll() {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+
         if let data = try? Data(contentsOf: conversationsURL),
-           let decoded = try? JSONDecoder().decode([Conversation].self, from: data) {
+           let decoded = try? decoder.decode([Conversation].self, from: data) {
             conversations = decoded
         }
         if let data = try? Data(contentsOf: spacesURL),
-           let decoded = try? JSONDecoder().decode([Space].self, from: data) {
+           let decoded = try? decoder.decode([Space].self, from: data) {
             spaces = decoded
         }
     }

@@ -15,12 +15,12 @@
 - `MainWindowView` — Primary desktop window with `NavigationSplitView`
   - Sidebar: search field, Home/Chat navigation, Spaces (folders) with create/delete
   - Detail pane: conversation list grouped by date, or `ConversationDetailView`
-  - Nate on/off toggle (`nateToggle`) in sidebar footer
-  - Hero card (`nateHeroCard`) on Home view when Nate is off — "Meet Nate" with activate button
+  - Sparkle on/off toggle (`sparkleToggle`) in sidebar footer
+  - Hero card (`sparkleHeroCard`) on Home view when Sparkle is off — "Meet Sparkle" with activate button
   - Status indicator showing Active/Off/Setup needed
 - `ConversationRowView` — Row displaying conversation title, summary, and time
 - `ConversationDetailView` — Shows conversation summary or full transcript with Summary/Transcript picker
-  - Transcript shows user messages (blue avatar) and Nate responses (orange circle avatar)
+  - Transcript shows user messages (blue avatar) and Sparkle responses (orange sparkle avatar)
 
 ### ConversationStore.swift
 - `ConversationExchange` — Single user-transcript + assistant-response pair with timestamp
@@ -41,7 +41,7 @@
   - `start()` / `stop()` — Lifecycle management
   - `handleShortcutTransition()` — Push-to-talk pipeline entry point
   - `sendTranscriptToClaudeWithScreenshot()` — Core AI pipeline: screenshot → Claude → TTS → pointing
-  - Transient cursor mode: if Nate is off, pressing hotkey temporarily shows the overlay
+  - Transient cursor mode: if Sparkle is off, pressing hotkey temporarily shows the overlay
 
 ### MenuBarPanelManager.swift
 - `MenuBarPanelManager` — `@MainActor` class for menu bar status item
@@ -61,4 +61,4 @@
 
 ### worker/src/index.ts
 - Cloudflare Worker proxy at `https://nativelearn-proxy.danteocualesjr.workers.dev` (worker name unchanged)
-- `ELEVENLABS_VOICE_ID` = `pNInz6obpgDQGcFmaJgB` (Adam, male voice)
+- `ELEVENLABS_VOICE_ID` = `XB0fDUnXU5powFXDhCwa` (Charlotte, female British voice)

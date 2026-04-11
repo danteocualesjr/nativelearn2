@@ -197,20 +197,33 @@ struct BlueCursorView: View {
     /// Only during the return flight can cursor movement cancel the animation.
     @State private var isReturningToCursor: Bool = false
 
+    // MARK: - Element Highlight State
+
+    /// Center point for the radial glow highlight in SwiftUI coordinates.
+    @State private var highlightCenter: CGPoint = .zero
+    /// Controls the fade-in/out of the radial glow highlight.
+    @State private var highlightOpacity: Double = 0.0
+
     // MARK: - Onboarding Video Layout
 
     private let onboardingVideoPlayerWidth: CGFloat = 330
     private let onboardingVideoPlayerHeight: CGFloat = 186
 
-    private let fullWelcomeMessage = "hey! i'm nate"
+    private let fullWelcomeMessage = "hey! i'm sparkle"
 
     private let navigationPointerPhrases = [
-        "right here!",
-        "this one!",
-        "over here!",
-        "click this!",
-        "here it is!",
-        "found it!"
+        "Right here!",
+        "This one!",
+        "Over here!",
+        "Click this!",
+        "Here it is!",
+        "Found it!",
+        "See this?",
+        "Look here!",
+        "Check this out!",
+        "Right there!",
+        "Got it!",
+        "Tap this!",
     ]
 
     var body: some View {
@@ -289,6 +302,29 @@ struct BlueCursorView: View {
                         bubbleSize = newSize
                     }
             }
+
+            // Element highlight — soft radial glow centered on the target point.
+            // Uses the sparkle's orange color as a diffuse spotlight to draw the
+            // user's eye without requiring precise element bounds.
+            Circle()
+                .fill(
+                    RadialGradient(
+                        gradient: Gradient(colors: [
+                            DS.Colors.overlayCursorBlue.opacity(0.55),
+                            DS.Colors.overlayCursorBlue.opacity(0.25),
+                            DS.Colors.overlayCursorBlue.opacity(0.0)
+                        ]),
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: 70
+                    )
+                )
+                .frame(width: 140, height: 140)
+                .shadow(color: DS.Colors.overlayCursorBlue.opacity(0.5), radius: 24, x: 0, y: 0)
+                .position(highlightCenter)
+                .opacity(highlightOpacity)
+                .animation(.easeOut(duration: 0.35), value: highlightOpacity)
+                .allowsHitTesting(false)
 
             // Navigation pointer bubble — shown when buddy arrives at a detected element.
             // Pops in with a scale-bounce (0.5x → 1.0x spring) and a bright initial
@@ -408,6 +444,46 @@ struct BlueCursorView: View {
 
             startNavigatingToElement(screenLocation: screenLocation)
         }
+        .onChange(of: companionManager.playEntranceAnimation) { shouldPlay in
+            guard shouldPlay, isCursorOnThisScreen else { return }
+            companionManager.playEntranceAnimation = false
+            playEntranceFlightAnimation()
+        }
+    }
+
+    // MARK: - Entrance Animation
+
+    /// Fly-in entrance: Sparkle swoops in from the top-right corner of the
+    /// screen to the cursor position, then does a bouncy landing.
+    private func playEntranceFlightAnimation() {
+        let mouseLocation = NSEvent.mouseLocation
+        let cursorTarget = convertScreenPointToSwiftUICoordinates(mouseLocation)
+        let destination = CGPoint(x: cursorTarget.x + 18, y: cursorTarget.y + 18)
+
+        let startPoint = CGPoint(x: screenFrame.width - 40, y: 40)
+        cursorPosition = startPoint
+        showWelcome = false
+        cursorOpacity = 1.0
+        buddyNavigationMode = .navigatingToTarget
+        triangleRotationDegrees = 180
+
+        animateBezierFlightArc(to: destination) {
+            self.buddyNavigationMode = .followingCursor
+            self.triangleRotationDegrees = -35.0
+            self.playLandingBounce()
+        }
+    }
+
+    /// Bouncy scale pulse on landing — springs up then settles back to 1.0.
+    private func playLandingBounce() {
+        withAnimation(.spring(response: 0.25, dampingFraction: 0.35, blendDuration: 0)) {
+            buddyFlightScale = 1.5
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.5, blendDuration: 0)) {
+                self.buddyFlightScale = 1.0
+            }
+        }
     }
 
     /// Whether the buddy sparkle should be visible on this screen.
@@ -496,6 +572,9 @@ struct BlueCursorView: View {
             x: max(20, min(offsetTarget.x, screenFrame.width - 20)),
             y: max(20, min(offsetTarget.y, screenFrame.height - 20))
         )
+
+        highlightCenter = targetInSwiftUI
+        highlightOpacity = 0.0
 
         // Record the current cursor position so we can detect if the user
         // moves the mouse enough to cancel the return flight
@@ -592,7 +671,8 @@ struct BlueCursorView: View {
     }
 
     /// Transitions to pointing mode — shows a speech bubble with a bouncy
-    /// scale-in entrance and variable-speed character streaming.
+    /// scale-in entrance and variable-speed character streaming. Also fades in
+    /// the element highlight if bounds were provided.
     private func startPointingAtElement() {
         buddyNavigationMode = .pointingAtTarget
 
@@ -605,6 +685,8 @@ struct BlueCursorView: View {
         navigationBubbleSize = .zero
         navigationBubbleScale = 0.5
 
+        highlightOpacity = 1.0
+
         // Use custom bubble text from the companion manager (e.g. onboarding demo)
         // if available, otherwise fall back to a random pointer phrase
         let pointerPhrase = companionManager.detectedElementBubbleText
@@ -616,6 +698,7 @@ struct BlueCursorView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                 guard self.buddyNavigationMode == .pointingAtTarget else { return }
                 self.navigationBubbleOpacity = 0.0
+                self.highlightOpacity = 0.0
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     guard self.buddyNavigationMode == .pointingAtTarget else { return }
                     self.startFlyingBackToCursor()
@@ -679,6 +762,7 @@ struct BlueCursorView: View {
         navigationBubbleOpacity = 0.0
         navigationBubbleScale = 1.0
         buddyFlightScale = 1.0
+        highlightOpacity = 0.0
         finishNavigationAndResumeFollowing()
     }
 
@@ -693,6 +777,7 @@ struct BlueCursorView: View {
         navigationBubbleText = ""
         navigationBubbleOpacity = 0.0
         navigationBubbleScale = 1.0
+        highlightOpacity = 0.0
         companionManager.clearDetectedElementLocation()
     }
 

@@ -49,12 +49,12 @@ struct CompanionPanelView: View {
                     .padding(.horizontal, 16)
             }
 
-            // Show Nate toggle — hidden for now
+            // Show Sparkle toggle — hidden for now
             // if companionManager.hasCompletedOnboarding && companionManager.allPermissionsGranted {
             //     Spacer()
             //         .frame(height: 16)
             //
-            //     showNateCursorToggleRow
+            //     showSparkleCursorToggleRow
             //         .padding(.horizontal, 16)
             // }
 
@@ -142,7 +142,7 @@ struct CompanionPanelView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         } else if companionManager.allPermissionsGranted {
-            Text("You're all set. Hit Start to meet Nate.")
+            Text("You're all set. Hit Start to meet Sparkle.")
                 .font(.system(size: 12, weight: .medium))
                 .foregroundColor(DS.Colors.textSecondary)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -165,7 +165,7 @@ struct CompanionPanelView: View {
                     .font(.system(size: 12, weight: .bold))
                     .foregroundColor(DS.Colors.textSecondary)
 
-                Text("Nate is your AI tutor that helps you become AI-native. He'll teach you how to use AI tools like Replit, Cursor, Claude Code, and more.")
+                Text("Sparkle is your AI tutor that helps you become AI-native. She'll teach you how to use AI tools like Replit, Cursor, Claude Code, and more.")
                     .font(.system(size: 11))
                     .foregroundColor(DS.Colors.textTertiary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -545,9 +545,9 @@ struct CompanionPanelView: View {
 
 
 
-    // MARK: - Show Nate Cursor Toggle
+    // MARK: - Show Sparkle Cursor Toggle
 
-    private var showNateCursorToggleRow: some View {
+    private var showSparkleCursorToggleRow: some View {
         HStack {
             HStack(spacing: 8) {
                 Image(systemName: "cursorarrow")
@@ -555,7 +555,7 @@ struct CompanionPanelView: View {
                     .foregroundColor(DS.Colors.textTertiary)
                     .frame(width: 16)
 
-                Text("Show Nate")
+                Text("Show Sparkle")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(DS.Colors.textSecondary)
             }
@@ -563,8 +563,8 @@ struct CompanionPanelView: View {
             Spacer()
 
             Toggle("", isOn: Binding(
-                get: { companionManager.isNateCursorEnabled },
-                set: { companionManager.setNateCursorEnabled($0) }
+                get: { companionManager.isSparkleCursorEnabled },
+                set: { companionManager.setSparkleCursorEnabled($0) }
             ))
             .toggleStyle(.switch)
             .labelsHidden()

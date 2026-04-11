@@ -275,6 +275,11 @@ final class BuddyDictationManager: NSObject, ObservableObject {
     private var pendingStartRequestIdentifier = UUID()
     private var contextualKeyterms: [String] = []
     private var lastRecordedAudioPowerSampleDate = Date.distantPast
+    /// Audio buffers captured before the transcription session's websocket is
+    /// ready. Flushed to the session immediately after it opens so no speech
+    /// is lost to connection setup latency.
+    private var preConnectionAudioBuffers: [AVAudioPCMBuffer] = []
+    private var isBufferingAudioBeforeSessionReady = false
     private var activePermissionRequestTask: Task<Bool, Never>?
     /// Timestamp of the last completed permission request, used to debounce
     /// rapid follow-up requests that arrive before macOS updates its cache.
@@ -463,6 +468,8 @@ final class BuddyDictationManager: NSObject, ObservableObject {
             isPreparingToRecord = false
             print("🎙️ BuddyDictationManager: recognition session started")
         } catch {
+            audioEngine.stop()
+            audioEngine.inputNode.removeTap(onBus: 0)
             isPreparingToRecord = false
             lastErrorMessage = userFacingErrorMessage(
                 from: error,
@@ -491,6 +498,19 @@ final class BuddyDictationManager: NSObject, ObservableObject {
         let finalTranscriptFallbackDelaySeconds = activeTranscriptionSession?.finalTranscriptFallbackDelaySeconds
             ?? Self.defaultFinalTranscriptFallbackDelaySeconds
 
+        // If the user released the keys while audio was still being buffered
+        // (websocket wasn't ready yet), flush buffered audio to the session first
+        if isBufferingAudioBeforeSessionReady, let session = activeTranscriptionSession {
+            let bufferedAudio = preConnectionAudioBuffers
+            preConnectionAudioBuffers = []
+            isBufferingAudioBeforeSessionReady = false
+            for bufferedAudioBuffer in bufferedAudio {
+                session.appendAudioBuffer(bufferedAudioBuffer)
+            }
+        }
+        preConnectionAudioBuffers = []
+        isBufferingAudioBeforeSessionReady = false
+
         audioEngine.stop()
         audioEngine.inputNode.removeTap(onBus: 0)
         activeTranscriptionSession?.requestFinalTranscript()
@@ -514,8 +534,31 @@ final class BuddyDictationManager: NSObject, ObservableObject {
     private func startRecognitionSession() async throws {
         activeTranscriptionSession?.cancel()
         activeTranscriptionSession = nil
+        preConnectionAudioBuffers = []
 
-        print("🎙️ BuddyDictationManager: opening transcription provider \(transcriptionProvider.displayName)")
+        // Start the audio engine BEFORE opening the transcription session so
+        // speech is captured from the moment the user presses the keys. Audio
+        // buffers are queued in preConnectionAudioBuffers and flushed to the
+        // session once the websocket is ready.
+        let inputNode = audioEngine.inputNode
+        let hardwareInputFormat = inputNode.inputFormat(forBus: 0)
+
+        inputNode.removeTap(onBus: 0)
+        isBufferingAudioBeforeSessionReady = true
+
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: hardwareInputFormat) { [weak self] buffer, _ in
+            guard let self else { return }
+            if self.isBufferingAudioBeforeSessionReady {
+                self.preConnectionAudioBuffers.append(buffer)
+            } else {
+                self.activeTranscriptionSession?.appendAudioBuffer(buffer)
+            }
+            self.updateAudioPowerLevel(from: buffer)
+        }
+
+        audioEngine.prepare()
+        try audioEngine.start()
+        print("🎙️ BuddyDictationManager: audio engine started, opening transcription provider \(transcriptionProvider.displayName)")
 
         let activeTranscriptionSession = try await transcriptionProvider.startStreamingSession(
             keyterms: buildTranscriptionKeyterms(),
@@ -544,26 +587,17 @@ final class BuddyDictationManager: NSObject, ObservableObject {
         )
 
         self.activeTranscriptionSession = activeTranscriptionSession
-        print("🎙️ BuddyDictationManager: provider ready, starting audio engine")
 
-        let inputNode = audioEngine.inputNode
+        // Flush all audio captured while the websocket was connecting
+        let bufferedAudio = preConnectionAudioBuffers
+        preConnectionAudioBuffers = []
+        isBufferingAudioBeforeSessionReady = false
 
-        // Use the hardware input format (inputFormat) rather than the node's
-        // output format (outputFormat) or nil. outputFormat and nil both resolve
-        // to the node's processing format, which can differ from the actual
-        // hardware sample rate (e.g. hardware at 24kHz vs node output at 48kHz),
-        // causing a "formats don't match" error (-10868) on engine.start().
-        // BuddyPCM16AudioConverter handles converting any rate to 16kHz PCM16.
-        let hardwareInputFormat = inputNode.inputFormat(forBus: 0)
-
-        inputNode.removeTap(onBus: 0)
-        inputNode.installTap(onBus: 0, bufferSize: 1024, format: hardwareInputFormat) { [weak self] buffer, _ in
-            self?.activeTranscriptionSession?.appendAudioBuffer(buffer)
-            self?.updateAudioPowerLevel(from: buffer)
+        for bufferedAudioBuffer in bufferedAudio {
+            activeTranscriptionSession.appendAudioBuffer(bufferedAudioBuffer)
         }
 
-        audioEngine.prepare()
-        try audioEngine.start()
+        print("🎙️ BuddyDictationManager: provider ready, flushed \(bufferedAudio.count) buffered audio chunks")
     }
 
     private func handleRecognitionError(_ error: Error) {
@@ -647,6 +681,8 @@ final class BuddyDictationManager: NSObject, ObservableObject {
         isRecordingFromKeyboardShortcut = false
         isKeyboardShortcutSessionActiveOrFinalizing = false
         isFinalizingTranscript = false
+        preConnectionAudioBuffers = []
+        isBufferingAudioBeforeSessionReady = false
         currentAudioPowerLevel = 0
         recordedAudioPowerHistory = Array(
             repeating: Self.recordedAudioPowerHistoryBaselineLevel,

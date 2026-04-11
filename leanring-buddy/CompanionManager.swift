@@ -44,6 +44,9 @@ final class CompanionManager: ObservableObject {
     /// Custom speech bubble text for the pointing animation. When set,
     /// BlueCursorView uses this instead of a random pointer phrase.
     @Published var detectedElementBubbleText: String?
+    /// Set to true once on app launch so BlueCursorView plays the fly-in
+    /// entrance animation. Reset to false after the animation starts.
+    @Published var playEntranceAnimation = false
 
     // MARK: - Onboarding Video State (shared across all screen overlays)
 
@@ -125,13 +128,13 @@ final class CompanionManager: ObservableObject {
     /// User preference for whether the Vibecademy cursor should be shown.
     /// When toggled off, the overlay is hidden and push-to-talk is disabled.
     /// Persisted to UserDefaults so the choice survives app restarts.
-    @Published var isNateCursorEnabled: Bool = UserDefaults.standard.object(forKey: "isNateCursorEnabled") == nil
+    @Published var isSparkleCursorEnabled: Bool = UserDefaults.standard.object(forKey: "isSparkleCursorEnabled") == nil
         ? true
-        : UserDefaults.standard.bool(forKey: "isNateCursorEnabled")
+        : UserDefaults.standard.bool(forKey: "isSparkleCursorEnabled")
 
-    func setNateCursorEnabled(_ enabled: Bool) {
-        isNateCursorEnabled = enabled
-        UserDefaults.standard.set(enabled, forKey: "isNateCursorEnabled")
+    func setSparkleCursorEnabled(_ enabled: Bool) {
+        isSparkleCursorEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: "isSparkleCursorEnabled")
         transientHideTask?.cancel()
         transientHideTask = nil
 
@@ -189,14 +192,18 @@ final class CompanionManager: ObservableObject {
         // well before the onboarding demo fires at ~40s into the video.
         _ = claudeAPI
 
-        // Show the cursor overlay on launch so Nate's circle is always visible.
-        if isNateCursorEnabled {
+        // Show the cursor overlay on launch so Sparkle is always visible.
+        if isSparkleCursorEnabled {
             if allPermissionsGranted {
                 hasCompletedOnboarding = true
             }
             overlayWindowManager.hasShownOverlayBefore = true
             overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
             isOverlayVisible = true
+
+            if hasCompletedOnboarding {
+                playEntranceAnimation = true
+            }
         }
     }
 
@@ -387,7 +394,7 @@ final class CompanionManager: ObservableObject {
                     UserDefaults.standard.set(true, forKey: "hasScreenContentPermission")
                     VibecademyAnalytics.trackPermissionGranted(permission: "screen_content")
 
-                    if allPermissionsGranted && !isOverlayVisible && isNateCursorEnabled {
+                    if allPermissionsGranted && !isOverlayVisible && isSparkleCursorEnabled {
                         hasCompletedOnboarding = true
                         overlayWindowManager.hasShownOverlayBefore = true
                         overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
@@ -488,7 +495,7 @@ final class CompanionManager: ObservableObject {
             transientHideTask = nil
 
             // If the cursor is hidden, bring it back transiently for this interaction
-            if !isNateCursorEnabled && !isOverlayVisible {
+            if !isSparkleCursorEnabled && !isOverlayVisible {
                 overlayWindowManager.hasShownOverlayBefore = true
                 overlayWindowManager.showOverlay(onScreens: NSScreen.screens, companionManager: self)
                 isOverlayVisible = true
@@ -548,7 +555,7 @@ final class CompanionManager: ObservableObject {
     // MARK: - Companion Prompt
 
     private static let companionVoiceResponseSystemPrompt = """
-    you're nate, an AI tutor that lives on the user's mac. your mission is to help people become AI-native — fluent and confident with AI tools. the user just spoke to you via push-to-talk and you can see their screen(s). your reply will be spoken aloud via text-to-speech, so write the way you'd actually talk. this is an ongoing conversation — you remember everything they've said before.
+    you're sparkle, an AI tutor that lives on the user's mac. your mission is to help people become AI-native — fluent and confident with AI tools. the user just spoke to you via push-to-talk and you can see their screen(s). your reply will be spoken aloud via text-to-speech, so write the way you'd actually talk. this is an ongoing conversation — you remember everything they've said before.
 
     your specialty:
     - you're an expert at teaching people how to use AI tools and products: Replit, Cursor, Claude Code, Codex, ChatGPT, Windsurf, v0, Bolt, Lovable, and any other AI-powered tool.
@@ -571,11 +578,13 @@ final class CompanionManager: ObservableObject {
     - if you receive multiple screen images, the one labeled "primary focus" is where the cursor is — prioritize that one but reference others if relevant.
 
     element pointing:
-    you have a small orange circle icon that can fly to and point at things on screen. as a tutor, pointing is your most powerful teaching tool — use it liberally. whenever you're telling the user to click something, look at something, or navigate somewhere, point at it. this makes your tutorials feel like having a real teacher sitting next to them.
+    you have a small orange circle icon that can fly to and point at things on screen. as a tutor, pointing is your most powerful teaching tool — use it as much as possible. whenever you mention anything that's visible on screen, point at it. this makes your tutorials feel like having a real teacher sitting next to them. a static sparkle that never moves feels lifeless. a sparkle that constantly flies around to show the user exactly what you're talking about feels alive and helpful.
 
-    always point when: guiding through UI, showing where buttons are, teaching navigation, demonstrating workflows, helping find menus or settings.
+    your default should be to point. look for ANY reason to point at something on screen. only use [POINT:none] when absolutely nothing on screen is relevant to what you're saying.
 
-    don't point when: answering conceptual questions, explaining theory, or when nothing on screen is relevant.
+    always point when: guiding through UI, showing where buttons are, teaching navigation, demonstrating workflows, helping find menus or settings, referencing any visible text or element, explaining what something on screen does, answering questions where you can point at something related on screen, or when the user's screen shows anything connected to the topic.
+
+    only skip pointing when: the conversation is purely abstract with zero connection to anything visible on screen.
 
     when you point, append a coordinate tag at the very end of your response, AFTER your spoken text. the screenshot images are labeled with their pixel dimensions. use those dimensions as the coordinate space. the origin (0,0) is the top-left corner of the image. x increases rightward, y increases downward.
 
@@ -585,7 +594,8 @@ final class CompanionManager: ObservableObject {
 
     examples:
     - user wants to learn Replit: "alright, first thing — see that blue plus button up there? click that to create a new project. replit calls them repls. [POINT:180,45:create repl button]"
-    - user asks what a prompt is: "a prompt is basically the instruction you give to an AI. think of it like telling a really smart assistant exactly what you need. the better your prompt, the better the result. [POINT:none]"
+    - user asks what a prompt is (and there's a text input on screen): "a prompt is basically the instruction you give to an AI. see that text box right there? that's where you'd type your prompt — the better you describe what you need, the better the result. [POINT:640,380:text input]"
+    - user asks a purely abstract question with nothing related on screen: "machine learning is how computers learn patterns from data, kind of like how you learn to recognize faces — you see enough examples and your brain figures out the pattern. [POINT:none]"
     - user learning Cursor: "see that composer panel on the right side? that's where you talk to the AI. try typing a request there, like 'add a dark mode toggle to this page'. [POINT:1200,400:composer panel]"
     - element is on screen 2: "that terminal is on your other screen — you'll want to run the command over there. [POINT:400,300:terminal:screen2]"
     """
@@ -741,12 +751,12 @@ final class CompanionManager: ObservableObject {
         }
     }
 
-    /// If the cursor is in transient mode (user toggled "Show Nate" off),
+    /// If the cursor is in transient mode (user toggled "Show Sparkle" off),
     /// waits for TTS playback and any pointing animation to finish, then
     /// fades out the overlay after a 1-second pause. Cancelled automatically
     /// if the user starts another push-to-talk interaction.
     private func scheduleTransientHideIfNeeded() {
-        guard !isNateCursorEnabled && isOverlayVisible else { return }
+        guard !isSparkleCursorEnabled && isOverlayVisible else { return }
 
         transientHideTask?.cancel()
         transientHideTask = Task {
@@ -803,11 +813,9 @@ final class CompanionManager: ObservableObject {
 
         guard let regex = try? NSRegularExpression(pattern: pattern, options: []),
               let match = regex.firstMatch(in: responseText, range: NSRange(responseText.startIndex..., in: responseText)) else {
-            // No tag found at all
             return PointingParseResult(spokenText: responseText, coordinate: nil, elementLabel: nil, screenNumber: nil)
         }
 
-        // Remove the tag from the spoken text
         let tagRange = Range(match.range, in: responseText)!
         let spokenText = String(responseText[..<tagRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -915,7 +923,7 @@ final class CompanionManager: ObservableObject {
     // MARK: - Onboarding Demo Interaction
 
     private static let onboardingDemoSystemPrompt = """
-    you're nate, a small orange circle buddy and AI tutor living on the user's screen. you're showing off during onboarding — look at their screen and find ONE specific, concrete thing to point at. pick something with a clear name or identity: a specific app icon (say its name), a specific word or phrase of text you can read, a specific filename, a specific button label, a specific tab title, a specific image you can describe. do NOT point at vague things like "a window" or "some text" — be specific about exactly what you see.
+    you're sparkle, a small sparkle-shaped buddy and AI tutor living on the user's screen. you're showing off during onboarding — look at their screen and find ONE specific, concrete thing to point at. pick something with a clear name or identity: a specific app icon (say its name), a specific word or phrase of text you can read, a specific filename, a specific button label, a specific tab title, a specific image you can describe. do NOT point at vague things like "a window" or "some text" — be specific about exactly what you see.
 
     make a short quirky 3-6 word observation about the specific thing you picked — something fun, playful, or curious that shows you actually read/recognized it. no emojis ever. NEVER quote or repeat text you see on screen — just react to it. keep it to 6 words max, no exceptions.
 
@@ -979,8 +987,6 @@ final class CompanionManager: ObservableObject {
                     y: appKitY + displayFrame.origin.y
                 )
 
-                // Set custom bubble text so the pointing animation uses Claude's
-                // comment instead of a random phrase
                 detectedElementBubbleText = parseResult.spokenText
                 detectedElementScreenLocation = globalLocation
                 detectedElementDisplayFrame = displayFrame

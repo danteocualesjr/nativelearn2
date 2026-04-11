@@ -49,7 +49,7 @@ enum VibecademyAnalytics {
         PostHogSDK.shared.capture("onboarding_video_completed")
     }
 
-    /// The 40s onboarding demo interaction where Nate points at something.
+    /// The 40s onboarding demo interaction where Sparkle points at something.
     static func trackOnboardingDemoTriggered() {
         PostHogSDK.shared.capture("onboarding_demo_triggered")
     }
