@@ -32,6 +32,8 @@ private let neutralGray400 = Color(hex: "#adb3b0")
 private let neutralGray500 = Color(hex: "#767c79")
 private let neutralGray600 = Color(hex: "#5a605e")
 
+private let sidebarLogoColor = Color(hex: "#C0504D")
+
 // MARK: - Tool Type Colors
 
 private let toolTypeColors: [ConversationToolType: Color] = [
@@ -98,7 +100,7 @@ struct MainWindowView: View {
                     withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = false }
                 } label: {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(themePrimary)
+                        .fill(sidebarLogoColor)
                         .frame(width: 32, height: 32)
                         .overlay(
                             Text("V")
@@ -115,22 +117,16 @@ struct MainWindowView: View {
             } else {
                 HStack(spacing: 12) {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(themePrimary)
+                        .fill(sidebarLogoColor)
                         .frame(width: 32, height: 32)
                         .overlay(
                             Text("V")
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
                         )
-                    VStack(alignment: .leading, spacing: 1) {
-                        Text("Vibecademy")
-                            .font(.system(size: 18, weight: .bold, design: .rounded))
-                            .foregroundColor(themeOnSurface)
-                        Text("THE DIGITAL ATHENEUM")
-                            .font(.system(size: 9, weight: .medium))
-                            .foregroundColor(themeOnSurfaceVariant.opacity(0.6))
-                            .tracking(2)
-                    }
+                    Text("Vibecademy")
+                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .foregroundColor(themeOnSurface)
                     Spacer()
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = true }
