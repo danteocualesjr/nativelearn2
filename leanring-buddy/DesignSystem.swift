@@ -140,7 +140,7 @@ enum DS {
 
         /// The orange cursor/bubble color used in OverlayWindow.
         /// A warm, vibrant orange that stands out against most screen content.
-        static let overlayCursorBlue = Color(hex: "#6B7280")
+        static let overlayCursorBlue = Color(hex: "#9a4800")
 
         // ── Floating Button Gradient ─────────────────────────────────
 
@@ -149,7 +149,7 @@ enum DS {
         /// to make the floating button stand out as a "jewel" on the desktop).
         static let floatingGradientPurple = Color(hex: "#8F46EB")
         static let floatingGradientPink = Color(hex: "#E84D9E")
-        static let floatingGradientOrange = Color(hex: "#6B7280")
+        static let floatingGradientOrange = Color(hex: "#9a4800")
 
         // ── Help Chat ──────────────────────────────────────────────
 
