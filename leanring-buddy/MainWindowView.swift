@@ -92,7 +92,7 @@ struct MainWindowView: View {
 
     private var sidebarView: some View {
         VStack(alignment: isSidebarCollapsed ? .center : .leading, spacing: 0) {
-            Spacer().frame(height: 52)
+            Spacer().frame(height: 32)
 
             // Logo + collapse toggle
             if isSidebarCollapsed {
