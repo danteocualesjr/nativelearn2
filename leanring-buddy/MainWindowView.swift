@@ -11,26 +11,26 @@ import SwiftUI
 
 // MARK: - Theme Colors (Material Design 3 — Vibe Academy light palette)
 
-private let themePrimary = Color(hex: "#b72301")
-private let themePrimaryContainer = Color(hex: "#ff5733")
-private let themeSecondary = Color(hex: "#904d00")
-private let themeSecondaryContainer = Color(hex: "#fd8b00")
-private let themeTertiary = Color(hex: "#765b00")
-private let themeTertiaryContainer = Color(hex: "#d4a500")
-private let themeSurface = Color(hex: "#f9f9f9")
-private let themeOnSurface = Color(hex: "#1b1b1b")
-private let themeSurfaceContainer = Color(hex: "#eeeeee")
-private let themeSurfaceContainerLow = Color(hex: "#f3f3f3")
-private let themeSurfaceContainerHigh = Color(hex: "#e8e8e8")
+private let themePrimary = Color(hex: "#5f5e5e")
+private let themePrimaryContainer = Color(hex: "#e5e2e1")
+private let themeSecondary = Color(hex: "#5f5f5f")
+private let themeSecondaryContainer = Color(hex: "#e4e2e2")
+private let themeTertiary = Color(hex: "#9a4800")
+private let themeTertiaryContainer = Color(hex: "#fa7e1d")
+private let themeSurface = Color(hex: "#f9f9f7")
+private let themeOnSurface = Color(hex: "#2d3432")
+private let themeSurfaceContainer = Color(hex: "#ecefec")
+private let themeSurfaceContainerLow = Color(hex: "#f2f4f2")
+private let themeSurfaceContainerHigh = Color(hex: "#e5e9e6")
 private let themeSurfaceContainerLowest = Color.white
-private let themeOnSurfaceVariant = Color(hex: "#5b403a")
-private let themeOutlineVariant = Color(hex: "#e4beb6")
+private let themeOnSurfaceVariant = Color(hex: "#5a605e")
+private let themeOutlineVariant = Color(hex: "#adb3b0")
 
-private let sidebarBg = Color(hex: "#f5f5f5")
-private let sidebarHoverBg = Color(hex: "#e5e5e5")
-private let neutralGray400 = Color(hex: "#a3a3a3")
-private let neutralGray500 = Color(hex: "#737373")
-private let neutralGray600 = Color(hex: "#525252")
+private let sidebarBg = Color(hex: "#f9f9f7")
+private let sidebarHoverBg = Color(hex: "#dee4e0")
+private let neutralGray400 = Color(hex: "#adb3b0")
+private let neutralGray500 = Color(hex: "#767c79")
+private let neutralGray600 = Color(hex: "#5a605e")
 
 // MARK: - Tool Type Colors
 
@@ -122,9 +122,15 @@ struct MainWindowView: View {
                                 .font(.system(size: 16, weight: .bold, design: .rounded))
                                 .foregroundColor(.white)
                         )
-                    Text("Vibecademy")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(themeOnSurface)
+                    VStack(alignment: .leading, spacing: 1) {
+                        Text("Vibecademy")
+                            .font(.system(size: 18, weight: .bold, design: .rounded))
+                            .foregroundColor(themeOnSurface)
+                        Text("THE DIGITAL ATHENEUM")
+                            .font(.system(size: 9, weight: .medium))
+                            .foregroundColor(themeOnSurfaceVariant.opacity(0.6))
+                            .tracking(2)
+                    }
                     Spacer()
                     Button {
                         withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = true }
@@ -322,7 +328,7 @@ struct MainWindowView: View {
                     ZStack(alignment: .topTrailing) {
                         Image(systemName: "sparkle")
                             .font(.system(size: 14))
-                            .foregroundColor(companionManager.isSparkleCursorEnabled ? themePrimary : neutralGray600)
+                            .foregroundColor(companionManager.isSparkleCursorEnabled ? themeTertiary : neutralGray600)
                             .frame(width: 40, height: 36)
                         Circle()
                             .fill(sparkleStatusColor)
@@ -365,7 +371,7 @@ struct MainWindowView: View {
                     HStack(spacing: 12) {
                         Image(systemName: "sparkle")
                             .font(.system(size: 14))
-                            .foregroundColor(companionManager.isSparkleCursorEnabled ? themePrimary : neutralGray600)
+                            .foregroundColor(companionManager.isSparkleCursorEnabled ? themeTertiary : neutralGray600)
                         Text("Sparkle")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(neutralGray600)
@@ -441,7 +447,7 @@ struct MainWindowView: View {
     private func sidebarNavRow(item: SidebarItem, icon: String, label: String) -> some View {
         let isSelected = sidebarSelection == item
         let isHovered = hoveredSidebarItem == item
-        let activeColor = Color(hex: "#c2410c")
+        let activeColor = themeOnSurface
 
         return Group {
             if isSidebarCollapsed {
@@ -451,8 +457,16 @@ struct MainWindowView: View {
                     .frame(width: 40, height: 36)
                     .background(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(isSelected ? Color.white.opacity(0.5) : (isHovered ? sidebarHoverBg : Color.clear))
+                            .fill(isHovered ? sidebarHoverBg.opacity(0.3) : Color.clear)
                     )
+                    .overlay(alignment: .leading) {
+                        if isSelected {
+                            Rectangle()
+                                .fill(themePrimary)
+                                .frame(width: 2)
+                        }
+                    }
+                    .opacity(isSelected || isHovered ? 1.0 : 0.7)
                     .nativeTooltip(label)
             } else {
                 HStack(spacing: 12) {
@@ -460,16 +474,25 @@ struct MainWindowView: View {
                         .font(.system(size: 14))
                         .foregroundColor(isSelected ? activeColor : neutralGray600)
                     Text(label)
-                        .font(.system(size: 13, weight: isSelected ? .bold : .medium))
+                        .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
                         .foregroundColor(isSelected ? activeColor : neutralGray600)
                     Spacer()
                 }
-                .padding(.horizontal, 12)
+                .padding(.leading, 16)
+                .padding(.trailing, 12)
                 .padding(.vertical, 8)
                 .background(
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isSelected ? Color.white.opacity(0.5) : (isHovered ? sidebarHoverBg : Color.clear))
+                        .fill(isHovered ? sidebarHoverBg.opacity(0.3) : Color.clear)
                 )
+                .overlay(alignment: .leading) {
+                    if isSelected {
+                        Rectangle()
+                            .fill(themePrimary)
+                            .frame(width: 2)
+                    }
+                }
+                .opacity(isSelected || isHovered ? 1.0 : 0.7)
             }
         }
         .contentShape(Rectangle())
@@ -714,13 +737,7 @@ struct MainWindowView: View {
                     .foregroundColor(themeOnSurfaceVariant)
 
                 Circle()
-                    .fill(
-                        LinearGradient(
-                            colors: [themePrimaryContainer, themePrimary],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(themePrimary)
                     .frame(width: 32, height: 32)
                     .overlay(
                         Text("D")
@@ -766,21 +783,21 @@ struct MainWindowView: View {
     private var trajectoryCard: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: [themePrimary, themePrimaryContainer],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+            .fill(
+                LinearGradient(
+                    colors: [themeOnSurface, Color(hex: "#3d4a47")],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
                 )
-                .shadow(color: themePrimary.opacity(0.2), radius: 24, y: 12)
+            )
+            .shadow(color: themeOnSurface.opacity(0.12), radius: 24, y: 12)
 
             // Abstract glow circle (decorative background element)
-            Circle()
-                .fill(Color.white.opacity(0.08))
-                .frame(width: 260, height: 260)
-                .blur(radius: 60)
-                .offset(x: 180, y: -60)
+        Circle()
+            .fill(Color.white.opacity(0.04))
+            .frame(width: 260, height: 260)
+            .blur(radius: 60)
+            .offset(x: 180, y: -60)
 
             VStack(alignment: .leading, spacing: 0) {
                 Text("STATS")
@@ -862,7 +879,7 @@ struct MainWindowView: View {
                     .trim(from: 0, to: streakProgress)
                     .stroke(
                         LinearGradient(
-                            colors: [themePrimary, themePrimaryContainer],
+                            colors: [themeTertiary, themeTertiaryContainer],
                             startPoint: .leading,
                             endPoint: .trailing
                         ),
@@ -874,7 +891,7 @@ struct MainWindowView: View {
                 VStack(spacing: 2) {
                     Text("\(consecutiveDayStreak)")
                         .font(.system(size: 28, weight: .bold, design: .rounded))
-                        .foregroundColor(themePrimary)
+                        .foregroundColor(themeTertiary)
                     Text("DAYS")
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
                         .foregroundColor(themeOnSurfaceVariant)
@@ -1558,11 +1575,11 @@ struct MainWindowView: View {
 
     private func gradientForConversation(_ conversation: Conversation) -> [Color] {
         let gradients: [[Color]] = [
-            [Color(hex: "#7c2d12"), Color(hex: "#ea580c")],
-            [Color(hex: "#78350f"), Color(hex: "#d97706")],
-            [Color(hex: "#422006"), Color(hex: "#a16207")],
-            [Color(hex: "#991b1b"), Color(hex: "#dc2626")],
-            [Color(hex: "#713f12"), Color(hex: "#ca8a04")],
+            [Color(hex: "#2d3432"), Color(hex: "#4a5552")],
+            [Color(hex: "#3d3c3c"), Color(hex: "#5f5e5e")],
+            [Color(hex: "#3a3530"), Color(hex: "#5a554f")],
+            [Color(hex: "#2f3530"), Color(hex: "#4d5349")],
+            [Color(hex: "#383838"), Color(hex: "#585858")],
         ]
         let index = abs(conversation.id.hashValue) % gradients.count
         return gradients[index]
