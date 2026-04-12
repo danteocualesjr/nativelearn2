@@ -56,6 +56,9 @@ final class MenuBarPanelManager: NSObject {
         if let observer = dismissPanelObserver {
             NotificationCenter.default.removeObserver(observer)
         }
+        if let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+        }
     }
 
     // MARK: - Status Item

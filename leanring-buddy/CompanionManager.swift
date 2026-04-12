@@ -306,6 +306,9 @@ final class CompanionManager: ObservableObject {
         overlayWindowManager.hideOverlay()
         transientHideTask?.cancel()
 
+        pendingKeyboardShortcutStartTask?.cancel()
+        pendingKeyboardShortcutStartTask = nil
+
         currentResponseTask?.cancel()
         currentResponseTask = nil
         shortcutTransitionCancellable?.cancel()
@@ -313,6 +316,8 @@ final class CompanionManager: ObservableObject {
         audioPowerCancellable?.cancel()
         accessibilityCheckTimer?.invalidate()
         accessibilityCheckTimer = nil
+
+        stopOnboardingMusic()
     }
 
     func refreshAllPermissions() {
@@ -680,6 +685,11 @@ final class CompanionManager: ObservableObject {
                     let displayHeight = CGFloat(targetScreenCapture.displayHeightInPoints)
                     let displayFrame = targetScreenCapture.displayFrame
 
+                    guard screenshotWidth > 0, screenshotHeight > 0 else {
+                        print("⚠️ Screenshot dimensions are zero — skipping element pointing")
+                        return
+                    }
+
                     // Clamp to screenshot coordinate space
                     let clampedX = max(0, min(pointCoordinate.x, screenshotWidth))
                     let clampedY = max(0, min(pointCoordinate.y, screenshotHeight))
@@ -737,7 +747,9 @@ final class CompanionManager: ObservableObject {
                     }
                 }
             } catch is CancellationError {
-                // User spoke again — response was interrupted
+                // User spoke again — response was interrupted.
+                // Reset voiceState so the UI doesn't stay stuck on the spinner.
+                voiceState = .idle
             } catch {
                 VibecademyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
@@ -816,7 +828,9 @@ final class CompanionManager: ObservableObject {
             return PointingParseResult(spokenText: responseText, coordinate: nil, elementLabel: nil, screenNumber: nil)
         }
 
-        let tagRange = Range(match.range, in: responseText)!
+        guard let tagRange = Range(match.range, in: responseText) else {
+            return PointingParseResult(spokenText: responseText, coordinate: nil, elementLabel: nil, screenNumber: nil)
+        }
         let spokenText = String(responseText[..<tagRange.lowerBound]).trimmingCharacters(in: .whitespacesAndNewlines)
 
         // Check if it's [POINT:none]

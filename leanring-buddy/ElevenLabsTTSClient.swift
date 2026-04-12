@@ -20,7 +20,10 @@ final class ElevenLabsTTSClient {
     private var audioPlayer: AVAudioPlayer?
 
     init(proxyURL: String) {
-        self.proxyURL = URL(string: proxyURL)!
+        guard let parsedURL = URL(string: proxyURL) else {
+            fatalError("ElevenLabsTTSClient: invalid proxy URL string — \(proxyURL)")
+        }
+        self.proxyURL = parsedURL
 
         let configuration = URLSessionConfiguration.default
         configuration.timeoutIntervalForRequest = 30

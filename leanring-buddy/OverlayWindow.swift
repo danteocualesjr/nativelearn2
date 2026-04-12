@@ -156,6 +156,7 @@ struct BlueCursorView: View {
         _isCursorOnThisScreen = State(initialValue: screenFrame.contains(mouseLocation))
     }
     @State private var timer: Timer?
+    @State private var welcomeAnimationTimer: Timer?
     @State private var welcomeText: String = ""
     @State private var showWelcome: Bool = true
     @State private var bubbleSize: CGSize = .zero
@@ -425,6 +426,7 @@ struct BlueCursorView: View {
         }
         .onDisappear {
             timer?.invalidate()
+            welcomeAnimationTimer?.invalidate()
             navigationAnimationTimer?.invalidate()
             companionManager.tearDownOnboardingVideo()
         }
@@ -573,7 +575,7 @@ struct BlueCursorView: View {
             y: max(20, min(offsetTarget.y, screenFrame.height - 20))
         )
 
-        highlightCenter = targetInSwiftUI
+        highlightCenter = clampedTarget
         highlightOpacity = 0.0
 
         // Record the current cursor position so we can detect if the user
@@ -789,7 +791,7 @@ struct BlueCursorView: View {
         }
 
         var currentIndex = 0
-        Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { timer in
+        welcomeAnimationTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { timer in
             guard currentIndex < self.fullWelcomeMessage.count else {
                 timer.invalidate()
                 // Hold the text for 2 seconds, then fade it out

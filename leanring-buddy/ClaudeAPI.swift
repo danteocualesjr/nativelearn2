@@ -15,7 +15,10 @@ class ClaudeAPI {
     private let session: URLSession
 
     init(proxyURL: String, model: String = "claude-sonnet-4-6") {
-        self.apiURL = URL(string: proxyURL)!
+        guard let parsedURL = URL(string: proxyURL) else {
+            fatalError("ClaudeAPI: invalid proxy URL string — \(proxyURL)")
+        }
+        self.apiURL = parsedURL
         self.model = model
 
         // Use .default instead of .ephemeral so TLS session tickets are cached.

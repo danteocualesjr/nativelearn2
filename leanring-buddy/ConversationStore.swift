@@ -143,6 +143,14 @@ final class ConversationStore: ObservableObject {
             _ = startNewConversation()
         }
 
+        // If the activeConversationId points to a conversation that no longer
+        // exists (e.g. it was deleted or failed to load), start a fresh one
+        // instead of silently dropping the exchange.
+        if conversations.firstIndex(where: { $0.id == activeConversationId }) == nil {
+            activeConversationId = nil
+            _ = startNewConversation()
+        }
+
         guard let idx = conversations.firstIndex(where: { $0.id == activeConversationId }) else { return }
 
         let exchange = ConversationExchange(
