@@ -34,6 +34,11 @@ final class CompanionManager: ObservableObject {
     /// Set by the app delegate so conversations are auto-saved to disk.
     var conversationStore: ConversationStore?
 
+    /// When true, Sparkle is stepping through a multi-point response sequence.
+    /// The overlay uses this to skip its auto-return-to-cursor after each point,
+    /// keeping Sparkle at each target until the next fly command arrives.
+    @Published var isMultiPointSequenceActive = false
+
     /// Screen location (global AppKit coords) of a detected UI element the
     /// buddy should fly to and point at. Parsed from Claude's response;
     /// observed by BlueCursorView to trigger the flight animation.
@@ -512,6 +517,7 @@ final class CompanionManager: ObservableObject {
             // Cancel any in-progress response and TTS from a previous utterance
             currentResponseTask?.cancel()
             elevenLabsTTSClient.stopPlayback()
+            isMultiPointSequenceActive = false
             clearDetectedElementLocation()
 
             // Dismiss the onboarding prompt if it's showing
@@ -591,17 +597,22 @@ final class CompanionManager: ObservableObject {
 
     only skip pointing when: the conversation is purely abstract with zero connection to anything visible on screen.
 
-    when you point, append a coordinate tag at the very end of your response, AFTER your spoken text. the screenshot images are labeled with their pixel dimensions. use those dimensions as the coordinate space. the origin (0,0) is the top-left corner of the image. x increases rightward, y increases downward.
+    you can use MULTIPLE point tags in a single response. place each [POINT:...] tag inline, right after the sentence or phrase that talks about that element. sparkle will fly to each location in order while speaking the surrounding text. this is incredibly powerful for giving tours or explaining multiple parts of an interface — sparkle will physically move from element to element as you talk about each one.
+
+    use multiple points when: giving an overview of a UI, explaining several features, walking through a workflow that involves multiple buttons or panels, or anytime you're referencing more than one thing on screen. the more you point, the more alive and helpful the tutorial feels.
+
+    the screenshot images are labeled with their pixel dimensions. use those dimensions as the coordinate space. the origin (0,0) is the top-left corner of the image. x increases rightward, y increases downward.
 
     format: [POINT:x,y:label] where x,y are integer pixel coordinates in the screenshot's coordinate space, and label is a short 1-3 word description of the element (like "search bar" or "save button"). if the element is on the cursor's screen you can omit the screen number. if the element is on a DIFFERENT screen, append :screenN where N is the screen number from the image label (e.g. :screen2). this is important — without the screen number, the cursor will point at the wrong place.
 
-    if pointing wouldn't help, append [POINT:none].
+    if pointing wouldn't help for the entire response, use a single [POINT:none] at the end.
 
     examples:
-    - user wants to learn Replit: "alright, first thing — see that blue plus button up there? click that to create a new project. replit calls them repls. [POINT:180,45:create repl button]"
-    - user asks what a prompt is (and there's a text input on screen): "a prompt is basically the instruction you give to an AI. see that text box right there? that's where you'd type your prompt — the better you describe what you need, the better the result. [POINT:640,380:text input]"
-    - user asks a purely abstract question with nothing related on screen: "machine learning is how computers learn patterns from data, kind of like how you learn to recognize faces — you see enough examples and your brain figures out the pattern. [POINT:none]"
-    - user learning Cursor: "see that composer panel on the right side? that's where you talk to the AI. try typing a request there, like 'add a dark mode toggle to this page'. [POINT:1200,400:composer panel]"
+    - single point, user wants to learn Replit: "alright, first thing — see that blue plus button up there? click that to create a new project. replit calls them repls. [POINT:180,45:create repl button]"
+    - single point, user asks what a prompt is: "a prompt is basically the instruction you give to an AI. see that text box right there? that's where you'd type your prompt — the better you describe what you need, the better the result. [POINT:640,380:text input]"
+    - no pointing, purely abstract question: "machine learning is how computers learn patterns from data, kind of like how you learn to recognize faces — you see enough examples and your brain figures out the pattern. [POINT:none]"
+    - multiple points, giving a tour of Cursor: "okay let me show you around. see these toggle icons up top? [POINT:380,52:toggle icons] this first one opens and closes the file explorer on the left side. and this one over here [POINT:420,52:terminal toggle] toggles the terminal panel at the bottom. and all these files on the left [POINT:140,300:file explorer] are the files in your project — click any of them to open it in the editor."
+    - multiple points, explaining a workflow: "to create a new file, first click the new file icon here. [POINT:160,35:new file button] then type your filename in that text field that appears. [POINT:160,55:filename input] once you hit enter, the file opens in the main editor panel over here. [POINT:700,400:editor panel]"
     - element is on screen 2: "that terminal is on your other screen — you'll want to run the command over there. [POINT:400,300:terminal:screen2]"
     """
 
@@ -610,31 +621,28 @@ final class CompanionManager: ObservableObject {
     /// Captures a screenshot, sends it along with the transcript to Claude,
     /// and plays the response aloud via ElevenLabs TTS. The cursor stays in
     /// the spinner/processing state until TTS audio begins playing.
-    /// Claude's response may include a [POINT:x,y:label] tag which triggers
-    /// the buddy to fly to that element on screen.
+    ///
+    /// Claude's response may include one or more inline `[POINT:x,y:label]`
+    /// tags. When multiple tags are present, Sparkle flies to each location
+    /// in sequence while speaking the surrounding text segments.
     private func sendTranscriptToClaudeWithScreenshot(transcript: String) {
         currentResponseTask?.cancel()
         elevenLabsTTSClient.stopPlayback()
 
         currentResponseTask = Task {
-            // Stay in processing (spinner) state — no streaming text displayed
             voiceState = .processing
+            print("📡 Sending transcript to Claude: \"\(transcript.prefix(80))...\"")
 
             do {
-                // Capture all connected screens so the AI has full context
                 let screenCaptures = try await CompanionScreenCaptureUtility.captureAllScreensAsJPEG()
 
                 guard !Task.isCancelled else { return }
 
-                // Build image labels with the actual screenshot pixel dimensions
-                // so Claude's coordinate space matches the image it sees. We
-                // scale from screenshot pixels to display points ourselves.
                 let labeledImages = screenCaptures.map { capture in
                     let dimensionInfo = " (image dimensions: \(capture.screenshotWidthInPixels)x\(capture.screenshotHeightInPixels) pixels)"
                     return (data: capture.imageData, label: capture.label + dimensionInfo)
                 }
 
-                // Pass conversation history so Claude remembers prior exchanges
                 let historyForAPI = conversationHistory.map { entry in
                     (userPlaceholder: entry.userTranscript, assistantResponse: entry.assistantResponse)
                 }
@@ -644,80 +652,36 @@ final class CompanionManager: ObservableObject {
                     systemPrompt: Self.companionVoiceResponseSystemPrompt,
                     conversationHistory: historyForAPI,
                     userPrompt: transcript,
-                    onTextChunk: { _ in
-                        // No streaming text display — spinner stays until TTS plays
-                    }
+                    onTextChunk: { _ in }
                 )
 
                 guard !Task.isCancelled else { return }
 
-                // Parse the [POINT:...] tag from Claude's response
-                let parseResult = Self.parsePointingCoordinates(from: fullResponseText)
-                let spokenText = parseResult.spokenText
+                let segments = Self.parseResponseIntoSegments(from: fullResponseText)
+                let pointSegmentCount = segments.filter({ $0.pointCoordinate != nil }).count
+                let hasMultiplePointSegments = pointSegmentCount > 1
+                print("📡 Claude responded: \(segments.count) segments, \(pointSegmentCount) with coordinates (multi-point: \(hasMultiplePointSegments))")
 
-                // Handle element pointing if Claude returned coordinates.
-                // Switch to idle BEFORE setting the location so the triangle
-                // becomes visible and can fly to the target. Without this, the
-                // spinner hides the triangle and the flight animation is invisible.
-                let hasPointCoordinate = parseResult.coordinate != nil
-                if hasPointCoordinate {
-                    voiceState = .idle
-                }
+                let fullSpokenText = segments.map { $0.spokenText }.joined(separator: " ")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
 
-                // Pick the screen capture matching Claude's screen number,
-                // falling back to the cursor screen if not specified.
-                let targetScreenCapture: CompanionScreenCapture? = {
-                    if let screenNumber = parseResult.screenNumber,
-                       screenNumber >= 1 && screenNumber <= screenCaptures.count {
-                        return screenCaptures[screenNumber - 1]
-                    }
-                    return screenCaptures.first(where: { $0.isCursorScreen })
-                }()
-
-                if let pointCoordinate = parseResult.coordinate,
-                   let targetScreenCapture {
-                    // Claude's coordinates are in the screenshot's pixel space
-                    // (top-left origin, e.g. 1280x831). Scale to the display's
-                    // point space (e.g. 1512x982), then convert to AppKit global coords.
-                    let screenshotWidth = CGFloat(targetScreenCapture.screenshotWidthInPixels)
-                    let screenshotHeight = CGFloat(targetScreenCapture.screenshotHeightInPixels)
-                    let displayWidth = CGFloat(targetScreenCapture.displayWidthInPoints)
-                    let displayHeight = CGFloat(targetScreenCapture.displayHeightInPoints)
-                    let displayFrame = targetScreenCapture.displayFrame
-
-                    guard screenshotWidth > 0, screenshotHeight > 0 else {
-                        print("⚠️ Screenshot dimensions are zero — skipping element pointing")
-                        return
-                    }
-
-                    // Clamp to screenshot coordinate space
-                    let clampedX = max(0, min(pointCoordinate.x, screenshotWidth))
-                    let clampedY = max(0, min(pointCoordinate.y, screenshotHeight))
-
-                    // Scale from screenshot pixels to display points
-                    let displayLocalX = clampedX * (displayWidth / screenshotWidth)
-                    let displayLocalY = clampedY * (displayHeight / screenshotHeight)
-
-                    // Convert from top-left origin (screenshot) to bottom-left origin (AppKit)
-                    let appKitY = displayHeight - displayLocalY
-
-                    // Convert display-local coords to global screen coords
-                    let globalLocation = CGPoint(
-                        x: displayLocalX + displayFrame.origin.x,
-                        y: appKitY + displayFrame.origin.y
+                if hasMultiplePointSegments {
+                    try await playMultiPointResponse(
+                        segments: segments,
+                        screenCaptures: screenCaptures
                     )
-
-                    detectedElementScreenLocation = globalLocation
-                    detectedElementDisplayFrame = displayFrame
-                    VibecademyAnalytics.trackElementPointed(elementLabel: parseResult.elementLabel)
-                    print("🎯 Element pointing: (\(Int(pointCoordinate.x)), \(Int(pointCoordinate.y))) → \"\(parseResult.elementLabel ?? "element")\"")
                 } else {
-                    print("🎯 Element pointing: \(parseResult.elementLabel ?? "no element")")
+                    try await playSinglePointResponse(
+                        segments: segments,
+                        screenCaptures: screenCaptures
+                    )
                 }
+
+                guard !Task.isCancelled else { return }
 
                 conversationHistory.append((
                     userTranscript: transcript,
-                    assistantResponse: spokenText
+                    assistantResponse: fullSpokenText
                 ))
 
                 if conversationHistory.count > 10 {
@@ -726,41 +690,190 @@ final class CompanionManager: ObservableObject {
 
                 conversationStore?.appendExchange(
                     userTranscript: transcript,
-                    assistantResponse: spokenText
+                    assistantResponse: fullSpokenText
                 )
 
                 print("🧠 Conversation history: \(conversationHistory.count) exchanges")
+                VibecademyAnalytics.trackAIResponseReceived(response: fullSpokenText)
 
-                VibecademyAnalytics.trackAIResponseReceived(response: spokenText)
-
-                // Play the response via TTS. Keep the spinner (processing state)
-                // until the audio actually starts playing, then switch to responding.
-                if !spokenText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                    do {
-                        try await elevenLabsTTSClient.speakText(spokenText)
-                        // speakText returns after player.play() — audio is now playing
-                        voiceState = .responding
-                    } catch {
-                        VibecademyAnalytics.trackTTSError(error: error.localizedDescription)
-                        print("⚠️ ElevenLabs TTS error: \(error)")
-                        speakCreditsErrorFallback()
-                    }
-                }
             } catch is CancellationError {
-                // User spoke again — response was interrupted.
-                // Reset voiceState so the UI doesn't stay stuck on the spinner.
                 voiceState = .idle
+                isMultiPointSequenceActive = false
             } catch {
                 VibecademyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
+                isMultiPointSequenceActive = false
                 speakCreditsErrorFallback()
             }
 
             if !Task.isCancelled {
                 voiceState = .idle
+                isMultiPointSequenceActive = false
                 scheduleTransientHideIfNeeded()
             }
         }
+    }
+
+    /// Handles responses with zero or one POINT tag — the original behavior.
+    /// Sparkle flies to one target (if any) while the full text plays as a
+    /// single TTS audio clip.
+    private func playSinglePointResponse(
+        segments: [MultiPointResponseSegment],
+        screenCaptures: [CompanionScreenCapture]
+    ) async throws {
+        let firstSegmentWithPoint = segments.first(where: { $0.pointCoordinate != nil })
+        let fullSpokenText = segments.map { $0.spokenText }.joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // Switch to idle BEFORE setting the location so the sparkle becomes
+        // visible and can fly to the target. Without this, the spinner hides
+        // the sparkle and the flight animation is invisible.
+        if firstSegmentWithPoint != nil {
+            voiceState = .idle
+        }
+
+        if let segment = firstSegmentWithPoint,
+           let pointCoordinate = segment.pointCoordinate {
+            let globalLocation = convertPointToGlobalScreenCoordinates(
+                pointCoordinate: pointCoordinate,
+                screenNumber: segment.pointScreenNumber,
+                screenCaptures: screenCaptures
+            )
+            if let globalLocation {
+                detectedElementScreenLocation = globalLocation.location
+                detectedElementDisplayFrame = globalLocation.displayFrame
+                VibecademyAnalytics.trackElementPointed(elementLabel: segment.pointLabel)
+                print("🎯 Element pointing: (\(Int(pointCoordinate.x)), \(Int(pointCoordinate.y))) → \"\(segment.pointLabel ?? "element")\"")
+            }
+        }
+
+        if !fullSpokenText.isEmpty {
+            do {
+                try await elevenLabsTTSClient.speakText(fullSpokenText)
+                voiceState = .responding
+            } catch {
+                VibecademyAnalytics.trackTTSError(error: error.localizedDescription)
+                print("⚠️ ElevenLabs TTS error: \(error)")
+                speakCreditsErrorFallback()
+            }
+        }
+    }
+
+    /// Handles responses with multiple POINT tags. Pre-fetches all TTS audio
+    /// in parallel, then plays each segment sequentially — flying Sparkle to
+    /// the associated screen location before each audio clip starts.
+    private func playMultiPointResponse(
+        segments: [MultiPointResponseSegment],
+        screenCaptures: [CompanionScreenCapture]
+    ) async throws {
+        print("🔀 Multi-point: preloading TTS for \(segments.count) segments")
+
+        // Pre-fetch TTS audio for every non-empty text segment in parallel
+        // so there's no network delay between segments during playback.
+        // Each segment is fetched independently; we collect the results by index.
+        var preloadedAudioBySegmentIndex: [Int: Data] = [:]
+
+        for (index, segment) in segments.enumerated() {
+            let textToSpeak = segment.spokenText.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !textToSpeak.isEmpty else { continue }
+            guard !Task.isCancelled else { return }
+
+            do {
+                let audioData = try await elevenLabsTTSClient.fetchAudioData(textToSpeak)
+                preloadedAudioBySegmentIndex[index] = audioData
+            } catch {
+                print("⚠️ ElevenLabs TTS preload error for segment \(index): \(error)")
+            }
+        }
+
+        guard !Task.isCancelled else { return }
+        print("🔀 Multi-point: preloaded \(preloadedAudioBySegmentIndex.count) audio segments, starting playback")
+
+        isMultiPointSequenceActive = true
+        voiceState = .idle
+
+        for (index, segment) in segments.enumerated() {
+            guard !Task.isCancelled else { return }
+
+            if let pointCoordinate = segment.pointCoordinate {
+                let globalLocation = convertPointToGlobalScreenCoordinates(
+                    pointCoordinate: pointCoordinate,
+                    screenNumber: segment.pointScreenNumber,
+                    screenCaptures: screenCaptures
+                )
+                if let globalLocation {
+                    detectedElementScreenLocation = globalLocation.location
+                    detectedElementDisplayFrame = globalLocation.displayFrame
+                    VibecademyAnalytics.trackElementPointed(elementLabel: segment.pointLabel)
+                    print("🎯 Multi-point [\(index + 1)/\(segments.count)]: (\(Int(pointCoordinate.x)), \(Int(pointCoordinate.y))) → \"\(segment.pointLabel ?? "element")\"")
+
+                    // Wait for the bezier flight animation to reach the target.
+                    // Flight duration is 0.6–1.4s; 1.0s covers most cases.
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                    guard !Task.isCancelled else { return }
+                }
+            }
+
+            if let audioData = preloadedAudioBySegmentIndex[index] {
+                do {
+                    try elevenLabsTTSClient.playAudioData(audioData)
+                    voiceState = .responding
+                    await elevenLabsTTSClient.waitForPlaybackCompletion()
+                } catch {
+                    print("⚠️ ElevenLabs TTS playback error for segment \(index): \(error)")
+                }
+            }
+        }
+
+        isMultiPointSequenceActive = false
+        print("🔀 Multi-point: sequence complete")
+    }
+
+    // MARK: - Coordinate Conversion
+
+    /// Converts a POINT tag's screenshot-pixel coordinate to global AppKit
+    /// screen coordinates, returning the location and display frame for the
+    /// overlay to use.
+    private func convertPointToGlobalScreenCoordinates(
+        pointCoordinate: CGPoint,
+        screenNumber: Int?,
+        screenCaptures: [CompanionScreenCapture]
+    ) -> (location: CGPoint, displayFrame: CGRect)? {
+        let targetScreenCapture: CompanionScreenCapture? = {
+            if let screenNumber,
+               screenNumber >= 1 && screenNumber <= screenCaptures.count {
+                return screenCaptures[screenNumber - 1]
+            }
+            return screenCaptures.first(where: { $0.isCursorScreen })
+        }()
+
+        guard let targetScreenCapture else { return nil }
+
+        let screenshotWidth = CGFloat(targetScreenCapture.screenshotWidthInPixels)
+        let screenshotHeight = CGFloat(targetScreenCapture.screenshotHeightInPixels)
+        let displayWidth = CGFloat(targetScreenCapture.displayWidthInPoints)
+        let displayHeight = CGFloat(targetScreenCapture.displayHeightInPoints)
+        let displayFrame = targetScreenCapture.displayFrame
+
+        guard screenshotWidth > 0, screenshotHeight > 0 else {
+            print("⚠️ Screenshot dimensions are zero — skipping element pointing")
+            return nil
+        }
+
+        let clampedX = max(0, min(pointCoordinate.x, screenshotWidth))
+        let clampedY = max(0, min(pointCoordinate.y, screenshotHeight))
+
+        let displayLocalX = clampedX * (displayWidth / screenshotWidth)
+        let displayLocalY = clampedY * (displayHeight / screenshotHeight)
+
+        let appKitY = displayHeight - displayLocalY
+
+        let globalLocation = CGPoint(
+            x: displayLocalX + displayFrame.origin.x,
+            y: appKitY + displayFrame.origin.y
+        )
+
+        return (location: globalLocation, displayFrame: displayFrame)
     }
 
     /// If the cursor is in transient mode (user toggled "Show Sparkle" off),
@@ -858,6 +971,110 @@ final class CompanionManager: ObservableObject {
             elementLabel: elementLabel,
             screenNumber: screenNumber
         )
+    }
+
+    // MARK: - Multi-Point Parsing
+
+    /// A single segment of a multi-point response. Each segment has spoken text
+    /// and an optional coordinate for Sparkle to fly to while that text plays.
+    struct MultiPointResponseSegment {
+        let spokenText: String
+        let pointCoordinate: CGPoint?
+        let pointLabel: String?
+        let pointScreenNumber: Int?
+    }
+
+    /// Splits Claude's response at every inline `[POINT:...]` tag into an ordered
+    /// array of segments. Text before each tag becomes the spoken text for that
+    /// segment, paired with the tag's coordinate. Any trailing text after the
+    /// last tag becomes a final text-only segment.
+    ///
+    /// Returns a single text-only segment (no coordinate) if there are no POINT
+    /// tags or only a `[POINT:none]`.
+    static func parseResponseIntoSegments(from responseText: String) -> [MultiPointResponseSegment] {
+        let pattern = #"\[POINT:(?:none|(\d+)\s*,\s*(\d+)(?::([^\]:\s][^\]:]*?))?(?::screen(\d+))?)\]"#
+
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
+            return [MultiPointResponseSegment(spokenText: responseText, pointCoordinate: nil, pointLabel: nil, pointScreenNumber: nil)]
+        }
+
+        let fullRange = NSRange(responseText.startIndex..., in: responseText)
+        let matches = regex.matches(in: responseText, options: [], range: fullRange)
+
+        if matches.isEmpty {
+            return [MultiPointResponseSegment(spokenText: responseText, pointCoordinate: nil, pointLabel: nil, pointScreenNumber: nil)]
+        }
+
+        // Check if the only match is [POINT:none] — treat as a single text-only segment
+        if matches.count == 1 {
+            let match = matches[0]
+            let matchedString = String(responseText[Range(match.range, in: responseText)!])
+            if matchedString == "[POINT:none]" {
+                let spokenText = responseText.replacingOccurrences(of: "[POINT:none]", with: "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return [MultiPointResponseSegment(spokenText: spokenText, pointCoordinate: nil, pointLabel: nil, pointScreenNumber: nil)]
+            }
+        }
+
+        var segments: [MultiPointResponseSegment] = []
+        var currentTextStartIndex = responseText.startIndex
+
+        for match in matches {
+            guard let tagRange = Range(match.range, in: responseText) else { continue }
+
+            let textBeforeTag = String(responseText[currentTextStartIndex..<tagRange.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Parse coordinate from this match
+            var coordinate: CGPoint? = nil
+            var elementLabel: String? = nil
+            var screenNumber: Int? = nil
+
+            if match.numberOfRanges >= 3,
+               let xRange = Range(match.range(at: 1), in: responseText),
+               let yRange = Range(match.range(at: 2), in: responseText),
+               let x = Double(responseText[xRange]),
+               let y = Double(responseText[yRange]) {
+                coordinate = CGPoint(x: x, y: y)
+
+                if match.numberOfRanges >= 4, let labelRange = Range(match.range(at: 3), in: responseText) {
+                    elementLabel = String(responseText[labelRange]).trimmingCharacters(in: .whitespaces)
+                }
+                if match.numberOfRanges >= 5, let screenRange = Range(match.range(at: 4), in: responseText) {
+                    screenNumber = Int(responseText[screenRange])
+                }
+            }
+
+            // Skip segments that have no text AND no coordinate (e.g. adjacent [POINT:none] tags)
+            if !textBeforeTag.isEmpty || coordinate != nil {
+                segments.append(MultiPointResponseSegment(
+                    spokenText: textBeforeTag,
+                    pointCoordinate: coordinate,
+                    pointLabel: elementLabel,
+                    pointScreenNumber: screenNumber
+                ))
+            }
+
+            currentTextStartIndex = tagRange.upperBound
+        }
+
+        // Any text after the last POINT tag becomes a trailing text-only segment
+        let trailingText = String(responseText[currentTextStartIndex...])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trailingText.isEmpty {
+            segments.append(MultiPointResponseSegment(
+                spokenText: trailingText,
+                pointCoordinate: nil,
+                pointLabel: nil,
+                pointScreenNumber: nil
+            ))
+        }
+
+        if segments.isEmpty {
+            return [MultiPointResponseSegment(spokenText: responseText, pointCoordinate: nil, pointLabel: nil, pointScreenNumber: nil)]
+        }
+
+        return segments
     }
 
     // MARK: - Onboarding Video

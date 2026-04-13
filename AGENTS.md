@@ -42,7 +42,7 @@ Built on top of [Clicky](https://github.com/farzaa/clicky) by Farza. Major chang
 - **Screen Capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
 - **Voice Input**: Push-to-talk (Control+Option) via `AVAudioEngine` + pluggable transcription-provider layer. System-wide keyboard shortcut via listen-only CGEvent tap.
 - **Companion Icon**: Orange sparkle (`sparkle` SF Symbol) — used in cursor overlay, menu bar, and transcript UI
-- **Element Pointing**: Claude embeds `[POINT:x,y:label:screenN]` tags in responses. The overlay parses these, maps coordinates to the correct monitor, and animates the circle along a bezier arc to the target.
+- **Element Pointing**: Claude embeds one or more inline `[POINT:x,y:label:screenN]` tags in responses. For multi-point responses, all TTS audio segments are pre-fetched in parallel, then played sequentially — Sparkle flies to each tagged location via bezier arc before speaking the surrounding text. Single-point responses (one trailing tag) follow the original path. `CompanionManager.isMultiPointSequenceActive` tells the overlay to skip its auto-return-to-cursor between points.
 - **Conversation Persistence**: JSON files in `~/Library/Application Support/Vibecademy/`. Conversations are auto-saved during voice interactions and grouped by date in the UI.
 - **Concurrency**: `@MainActor` isolation, async/await throughout
 - **Analytics**: PostHog via `ClickyAnalytics.swift`
@@ -81,12 +81,12 @@ Worker vars: `ELEVENLABS_VOICE_ID` (set to `XB0fDUnXU5powFXDhCwa` — Charlotte 
 | File | Lines | Purpose |
 |------|-------|---------|
 | `leanring_buddyApp.swift` | ~70 | App entry point. `WindowGroup` displays `MainWindowView`. `CompanionAppDelegate` creates `CompanionManager`, `ConversationStore`, and `MenuBarPanelManager`, then starts the companion pipeline on launch. |
-| `CompanionManager.swift` | ~992 | Central state machine. Owns dictation, shortcut monitoring, screen capture, Claude API, ElevenLabs TTS, overlay management, and Sparkle on/off toggle (`isSparkleCursorEnabled`). Coordinates the full push-to-talk → screenshot → Claude → TTS → pointing pipeline. Auto-saves voice exchanges to `ConversationStore`. |
+| `CompanionManager.swift` | ~1239 | Central state machine. Owns dictation, shortcut monitoring, screen capture, Claude API, ElevenLabs TTS, overlay management, and Sparkle on/off toggle (`isSparkleCursorEnabled`). Coordinates the full push-to-talk → screenshot → Claude → TTS → pointing pipeline with multi-point support (inline `[POINT:...]` tags, parallel TTS preloading, sequential segment playback). Auto-saves voice exchanges to `ConversationStore`. |
 | `MainWindowView.swift` | ~859 | Primary desktop window UI. Granola-style layout with sidebar (search, Home, Chat, Spaces) and detail pane (conversation list grouped by date, or conversation detail view). Sidebar footer has icon toolbar (Sparkle toggle, model picker, settings), status row, and brand row. Hero card at top of Home view adapts to Sparkle state (setup needed, Meet Sparkle activation, or push-to-talk instructions). |
 | `ConversationStore.swift` | ~248 | Persistent conversation storage. Data models: `ConversationExchange`, `Conversation`, `Space`. Saves/loads JSON in `~/Library/Application Support/Vibecademy/`. Groups conversations by date. Supports Spaces (folders) for organizing conversations. |
 | `MenuBarPanelManager.swift` | ~243 | NSStatusItem + custom NSPanel lifecycle. Creates the circle menu bar icon, manages the floating companion panel (show/hide/position), installs click-outside-to-dismiss monitor. Panel is draggable. |
 | `CompanionPanelView.swift` | ~761 | SwiftUI panel content for the menu bar dropdown. Shows companion status, push-to-talk instructions, model picker (Sonnet/Opus), permissions UI, DM feedback button, and quit button. Dark aesthetic using `DS` design system. |
-| `OverlayWindow.swift` | ~872 | Full-screen transparent overlay hosting the circle cursor, response text, waveform, and spinner. Handles cursor animation, element pointing with bezier arcs, multi-monitor coordinate mapping, and fade-out transitions. |
+| `OverlayWindow.swift` | ~1012 | Full-screen transparent `NSPanel` overlay (floating, non-activating) hosting the sparkle cursor, response text, waveform, and spinner. Stays visible above all apps and in fullscreen Spaces. Handles cursor animation, element pointing with bezier arcs, multi-monitor coordinate mapping, multi-point sequence support, and fade-out transitions. |
 | `CompanionResponseOverlay.swift` | ~217 | SwiftUI view for the response text bubble and waveform displayed next to the cursor in the overlay. |
 | `CompanionScreenCaptureUtility.swift` | ~132 | Multi-monitor screenshot capture using ScreenCaptureKit. Returns labeled image data for each connected display. |
 | `BuddyDictationManager.swift` | ~866 | Push-to-talk voice pipeline. Handles microphone capture via `AVAudioEngine`, provider-aware permission checks, keyboard/button dictation sessions, transcript finalization, shortcut parsing, contextual keyterms, and live audio-level reporting for waveform feedback. |
@@ -98,7 +98,7 @@ Worker vars: `ELEVENLABS_VOICE_ID` (set to `XB0fDUnXU5powFXDhCwa` — Charlotte 
 | `GlobalPushToTalkShortcutMonitor.swift` | ~132 | System-wide push-to-talk monitor. Owns the listen-only `CGEvent` tap and publishes press/release transitions. |
 | `ClaudeAPI.swift` | ~291 | Claude vision API client with streaming (SSE) and non-streaming modes. TLS warmup optimization, image MIME detection, conversation history support. |
 | `OpenAIAPI.swift` | ~142 | OpenAI GPT vision API client. |
-| `ElevenLabsTTSClient.swift` | ~81 | ElevenLabs TTS client. Sends text to the Worker proxy, plays back audio via `AVAudioPlayer`. Exposes `isPlaying` for transient cursor scheduling. |
+| `ElevenLabsTTSClient.swift` | ~106 | ElevenLabs TTS client. Sends text to the Worker proxy, plays back audio via `AVAudioPlayer`. Supports preloading audio via `fetchAudioData` for multi-point segment playback. Exposes `isPlaying` and `waitForPlaybackCompletion` for sequencing. |
 | `ElementLocationDetector.swift` | ~335 | Detects UI element locations in screenshots for cursor pointing. |
 | `DesignSystem.swift` | ~879 | Design system tokens — colors, corner radii, shared styles. All UI references `DS.Colors`, `DS.CornerRadius`, etc. `overlayCursorBlue` is actually orange (`#FF8C33`), used for the sparkle icon. |
 | `ClickyAnalytics.swift` | ~122 | PostHog analytics integration (`VibecademyAnalytics`) for usage tracking. |

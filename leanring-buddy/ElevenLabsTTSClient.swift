@@ -31,9 +31,10 @@ final class ElevenLabsTTSClient {
         self.session = URLSession(configuration: configuration)
     }
 
-    /// Sends `text` to ElevenLabs TTS and plays the resulting audio.
+    /// Fetches TTS audio from ElevenLabs without playing it. Use this to
+    /// preload audio for multiple segments before sequential playback.
     /// Throws on network or decoding errors. Cancellation-safe.
-    func speakText(_ text: String) async throws {
+    func fetchAudioData(_ text: String) async throws -> Data {
         var request = URLRequest(url: proxyURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -64,11 +65,32 @@ final class ElevenLabsTTSClient {
         }
 
         try Task.checkCancellation()
+        return data
+    }
 
+    /// Plays previously fetched audio data. Replaces any in-progress playback.
+    func playAudioData(_ data: Data) throws {
         let player = try AVAudioPlayer(data: data)
         self.audioPlayer = player
         player.play()
         print("🔊 ElevenLabs TTS: playing \(data.count / 1024)KB audio")
+    }
+
+    /// Blocks until the current audio playback finishes. Returns immediately
+    /// if nothing is playing. Checks every 200ms. Cancellation-safe.
+    func waitForPlaybackCompletion() async {
+        while isPlaying {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            if Task.isCancelled { return }
+        }
+    }
+
+    /// Sends `text` to ElevenLabs TTS and plays the resulting audio.
+    /// Convenience wrapper around fetchAudioData + playAudioData.
+    /// Throws on network or decoding errors. Cancellation-safe.
+    func speakText(_ text: String) async throws {
+        let audioData = try await fetchAudioData(text)
+        try playAudioData(audioData)
     }
 
     /// Whether TTS audio is currently playing back.

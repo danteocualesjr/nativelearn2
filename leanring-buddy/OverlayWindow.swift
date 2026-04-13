@@ -11,38 +11,37 @@ import AppKit
 import AVFoundation
 import SwiftUI
 
-class OverlayWindow: NSWindow {
+/// NSPanel-based overlay that stays visible above all other apps, including
+/// fullscreen windows and other Spaces. Using NSPanel with isFloatingPanel
+/// instead of a plain NSWindow because macOS hides regular windows when
+/// the app deactivates — even with hidesOnDeactivate = false — whereas
+/// a floating panel gets special window-server treatment to remain on top.
+class OverlayWindow: NSPanel {
     init(screen: NSScreen) {
-        // Create window covering entire screen
         super.init(
             contentRect: screen.frame,
-            styleMask: .borderless,
+            styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
 
-        // Make window transparent and non-interactive
+        self.isFloatingPanel = true
         self.isOpaque = false
         self.backgroundColor = .clear
-        self.level = .screenSaver  // Always on top, above submenus and popups
-        self.ignoresMouseEvents = true  // Click-through
+        self.level = .screenSaver
+        self.ignoresMouseEvents = true
         self.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary]
         self.isReleasedWhenClosed = false
         self.hasShadow = false
-
-        // Important: Allow the window to appear even when app is not active
         self.hidesOnDeactivate = false
 
-        // Cover the entire screen
         self.setFrame(screen.frame, display: true)
 
-        // Make sure it's on the right screen
         if let screenForWindow = NSScreen.screens.first(where: { $0.frame == screen.frame }) {
             self.setFrameOrigin(screenForWindow.frame.origin)
         }
     }
 
-    // Prevent window from becoming key (no focus stealing)
     override var canBecomeKey: Bool {
         return false
     }
@@ -431,20 +430,29 @@ struct BlueCursorView: View {
             companionManager.tearDownOnboardingVideo()
         }
         .onChange(of: companionManager.detectedElementScreenLocation) { newLocation in
-            // When a UI element location is detected, navigate the buddy to
-            // that position so it points at the element.
             guard let screenLocation = newLocation,
                   let displayFrame = companionManager.detectedElementDisplayFrame else {
                 return
             }
 
-            // Only navigate if the target is on THIS screen
             guard screenFrame.contains(CGPoint(x: displayFrame.midX, y: displayFrame.midY))
                   || displayFrame == screenFrame else {
                 return
             }
 
             startNavigatingToElement(screenLocation: screenLocation)
+        }
+        .onChange(of: companionManager.isMultiPointSequenceActive) { isActive in
+            // When a multi-point sequence ends while Sparkle is still pointing
+            // at a target, trigger the return-to-cursor flight.
+            if !isActive && buddyNavigationMode == .pointingAtTarget {
+                navigationBubbleOpacity = 0.0
+                highlightOpacity = 0.0
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    guard self.buddyNavigationMode == .pointingAtTarget else { return }
+                    self.startFlyingBackToCursor()
+                }
+            }
         }
         .onChange(of: companionManager.playEntranceAnimation) { shouldPlay in
             guard shouldPlay, isCursorOnThisScreen else { return }
@@ -675,13 +683,15 @@ struct BlueCursorView: View {
     /// Transitions to pointing mode — shows a speech bubble with a bouncy
     /// scale-in entrance and variable-speed character streaming. Also fades in
     /// the element highlight if bounds were provided.
+    ///
+    /// During a multi-point sequence, skips the 3-second dwell and auto-return
+    /// so Sparkle stays at each target until CompanionManager sends it to the
+    /// next location or ends the sequence.
     private func startPointingAtElement() {
         buddyNavigationMode = .pointingAtTarget
 
-        // Rotate back to default pointer angle now that we've arrived
         triangleRotationDegrees = -35.0
 
-        // Reset navigation bubble state — start small for the scale-bounce entrance
         navigationBubbleText = ""
         navigationBubbleOpacity = 1.0
         navigationBubbleSize = .zero
@@ -689,14 +699,21 @@ struct BlueCursorView: View {
 
         highlightOpacity = 1.0
 
-        // Use custom bubble text from the companion manager (e.g. onboarding demo)
-        // if available, otherwise fall back to a random pointer phrase
         let pointerPhrase = companionManager.detectedElementBubbleText
             ?? navigationPointerPhrases.randomElement()
             ?? "right here!"
 
+        let shouldSkipAutoReturn = companionManager.isMultiPointSequenceActive
+
         streamNavigationBubbleCharacter(phrase: pointerPhrase, characterIndex: 0) {
-            // All characters streamed — hold for 3 seconds, then fly back
+            if shouldSkipAutoReturn {
+                // Multi-point mode: stay at this target. CompanionManager
+                // will set a new detectedElementScreenLocation (triggering
+                // another flight) or clear isMultiPointSequenceActive
+                // (triggering the return via onChange below).
+                return
+            }
+
             DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
                 guard self.buddyNavigationMode == .pointingAtTarget else { return }
                 self.navigationBubbleOpacity = 0.0
