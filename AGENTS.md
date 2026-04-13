@@ -33,7 +33,7 @@ Built on top of [Clicky](https://github.com/farzaa/clicky) by Farza. Major chang
 
 ## Architecture
 
-- **App Type**: Desktop app with main window + menu bar status item (`LSUIElement=false`)
+- **App Type**: Desktop app with main window + menu bar status item (`LSUIElement=false` in Info.plist)
 - **Framework**: SwiftUI (macOS native) with AppKit bridging for menu bar panel and cursor overlay
 - **Pattern**: MVVM with `@StateObject` / `@ObservedObject` / `@Published` state management
 - **AI Chat**: Claude (Sonnet 4.6 default, Opus 4.6 optional) via Cloudflare Worker proxy with SSE streaming
@@ -62,7 +62,7 @@ Worker vars: `ELEVENLABS_VOICE_ID` (set to `XB0fDUnXU5powFXDhCwa` — Charlotte 
 
 ### Key Architecture Decisions
 
-**Desktop Window + Menu Bar**: The app launches with a full `WindowGroup` containing `MainWindowView` (sidebar + detail). The menu bar status item with circle icon remains as a secondary access point. `LSUIElement` is `true` and the app switches to `.regular` activation policy after overlay setup.
+**Desktop Window + Menu Bar**: The app launches with a full `WindowGroup` containing `MainWindowView` (sidebar + detail). The menu bar status item with circle icon remains as a secondary access point. `LSUIElement` is `false` so the app starts as a regular Dock app — this ensures Xcode properly terminates the previous instance on re-run.
 
 **Sparkle Toggle**: `CompanionManager.isSparkleCursorEnabled` controls whether the cursor overlay is visible. Defaults to `false` — the desktop app shows first, and the user activates Sparkle via a toggle in the sidebar or a hero card on the Home view. The preference is persisted to `UserDefaults`. Even when Sparkle is off, pressing Control+Option temporarily brings the overlay back for that interaction (transient cursor mode).
 

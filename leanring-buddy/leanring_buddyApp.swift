@@ -2,10 +2,9 @@
 //  leanring_buddyApp.swift
 //  leanring-buddy
 //
-//  Menu bar companion app with a separate main window for conversation
-//  history. LSUIElement=true keeps the app out of the Dock so the cursor
-//  overlay works correctly across all apps. The main window is created
-//  programmatically via NSWindow + NSHostingView.
+//  Desktop app with a main window for conversation history and a menu
+//  bar companion. The main window is created programmatically via
+//  NSWindow + NSHostingView.
 //
 
 import ServiceManagement
@@ -38,20 +37,12 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
 
         companionManager.conversationStore = conversationStore
 
-        // 1) Start companion in accessory mode (LSUIElement=true) so the
-        //    overlay windows are created with the correct window levels.
         menuBarPanelManager = MenuBarPanelManager(companionManager: companionManager)
         companionManager.start()
         if !companionManager.hasCompletedOnboarding || !companionManager.allPermissionsGranted {
             menuBarPanelManager?.showPanelOnLaunch()
         }
 
-        // 2) Switch to regular app AFTER overlay is set up. This gives us
-        //    Dock icon, menu bar, and proper full-screen support.
-        NSApplication.shared.setActivationPolicy(.regular)
-
-        // 3) Re-assert overlay window levels after the policy switch,
-        //    since changing activation policy can reset window ordering.
         reassertOverlayWindows()
 
         registerAsLoginItemIfNeeded()
