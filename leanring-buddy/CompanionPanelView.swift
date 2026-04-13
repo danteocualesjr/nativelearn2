@@ -86,11 +86,7 @@ struct CompanionPanelView: View {
     private var panelHeader: some View {
         HStack {
             HStack(spacing: 8) {
-                // Animated status sparkle
-                SparkleShape()
-                    .fill(statusDotColor)
-                    .frame(width: 10, height: 10)
-                    .shadow(color: statusDotColor.opacity(0.6), radius: 4)
+                GlassSparkleView(baseColor: statusDotColor, size: 10, glowRadius: 4)
 
                 Text("Vibecademy")
                     .font(.system(size: 14, weight: .semibold))

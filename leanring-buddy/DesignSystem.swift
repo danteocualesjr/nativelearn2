@@ -852,6 +852,71 @@ extension View {
     }
 }
 
+// MARK: - Glass Sparkle View
+
+/// A reusable sparkle icon with an Apple-style glass/translucent treatment.
+/// Layers a gradient fill, a specular highlight stroke, and a colored glow
+/// shadow on top of the base `SparkleShape` geometry.
+struct GlassSparkleView: View {
+    let baseColor: Color
+    let size: CGFloat
+    var glowRadius: CGFloat = 3
+    var isMuted: Bool = false
+
+    var body: some View {
+        let lighterTint = baseColor.blendedWithWhite(fraction: isMuted ? 0.15 : 0.45)
+        let overallOpacity: Double = isMuted ? 0.3 : 1.0
+
+        ZStack {
+            SparkleShape()
+                .fill(
+                    LinearGradient(
+                        colors: [lighterTint, baseColor],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+
+            // Inner highlight stroke — bright at the top, fading to transparent
+            // at the bottom, creating the glass rim/edge effect.
+            SparkleShape()
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(isMuted ? 0.1 : 0.55),
+                            Color.white.opacity(0.0)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    ),
+                    lineWidth: size > 16 ? 1.2 : 0.8
+                )
+
+            // Specular glint near the top — only visible at larger sizes
+            // where there are enough pixels for it to read clearly.
+            if size >= 24 && !isMuted {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                Color.white.opacity(0.7),
+                                Color.white.opacity(0.0)
+                            ],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: size * 0.15
+                        )
+                    )
+                    .frame(width: size * 0.3, height: size * 0.3)
+                    .offset(y: -size * 0.18)
+            }
+        }
+        .frame(width: size, height: size)
+        .shadow(color: baseColor.opacity(isMuted ? 0.1 : 0.5), radius: glowRadius, x: 0, y: 0)
+        .opacity(overallOpacity)
+    }
+}
+
 // MARK: - Color Utilities
 
 extension Color {

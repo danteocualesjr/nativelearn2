@@ -366,9 +366,7 @@ struct BlueCursorView: View {
             // All three states (sparkle, waveform, spinner) stay in the view tree
             // permanently and cross-fade via opacity so SwiftUI doesn't remove/re-insert
             // them (which caused a visible cursor "pop").
-            SparkleShape()
-                .fill(DS.Colors.overlayCursorBlue)
-                .frame(width: 12, height: 12)
+            GlassSparkleView(baseColor: DS.Colors.overlayCursorBlue, size: 12, glowRadius: 0)
                 .shadow(color: DS.Colors.overlayCursorBlue, radius: 3 + (buddyFlightScale - 1.0) * 10, x: 0, y: 0)
                 .scaleEffect(buddyFlightScale)
                 .opacity(buddyIsVisibleOnThisScreen && !showWelcome && (companionManager.voiceState == .idle || companionManager.voiceState == .responding) ? cursorOpacity : 0)

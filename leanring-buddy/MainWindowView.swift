@@ -1310,9 +1310,7 @@ struct MainWindowView: View {
             heroCardContainer {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
-                        SparkleShape()
-                            .fill(themePrimary)
-                            .frame(width: 14, height: 14)
+                        GlassSparkleView(baseColor: themePrimary, size: 14)
                         Text("Setup Vibecademy")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(themeOnSurface)
@@ -1328,9 +1326,7 @@ struct MainWindowView: View {
                 HStack(spacing: 16) {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(spacing: 8) {
-                            SparkleShape()
-                                .fill(themePrimary)
-                                .frame(width: 14, height: 14)
+                            GlassSparkleView(baseColor: themePrimary, size: 14)
                             Text("Meet Sparkle")
                                 .font(.system(size: 15, weight: .semibold))
                                 .foregroundColor(themeOnSurface)
@@ -1381,9 +1377,7 @@ struct MainWindowView: View {
 
     private var emptyStateView: some View {
         VStack(spacing: 16) {
-            SparkleShape()
-                .fill(neutralGray400.opacity(0.3))
-                .frame(width: 32, height: 32)
+            GlassSparkleView(baseColor: neutralGray400, size: 32, isMuted: true)
             Text("No conversations yet")
                 .font(.system(size: 17, weight: .medium, design: .rounded))
                 .foregroundColor(neutralGray500)
@@ -2277,9 +2271,7 @@ struct ConversationDetailView: View {
                     HStack(alignment: .top, spacing: 12) {
                         ZStack {
                             Circle().fill(themePrimary)
-                            SparkleShape()
-                                .fill(.white)
-                                .frame(width: 14, height: 14)
+                            GlassSparkleView(baseColor: .white, size: 14, glowRadius: 0)
                         }
                         .frame(width: 28, height: 28)
 
