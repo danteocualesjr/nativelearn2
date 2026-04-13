@@ -119,9 +119,7 @@ struct MainWindowView: View {
                     )
                     .frame(width: 32, height: 32)
                     .overlay(
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 16, weight: .medium))
-                            .foregroundColor(.white)
+                        GlassSparkleView(baseColor: .white, size: 16, glowRadius: 0)
                     )
                 VStack(alignment: .leading, spacing: 1) {
                     Text("Sparkle")
@@ -693,7 +691,7 @@ struct MainWindowView: View {
                 .tracking(-1.5)
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-            Text("Ready to master a new LLM today?")
+            Text("Ready to master a new AI tool today?")
                 .font(.system(size: 17, weight: .medium))
                 .foregroundColor(themeOnSurfaceVariant)
         }

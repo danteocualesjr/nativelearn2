@@ -138,9 +138,9 @@ enum DS {
 
         // ── Overlay Cursor ───────────────────────────────────────────
 
-        /// The orange cursor/bubble color used in OverlayWindow.
-        /// A warm, vibrant orange that stands out against most screen content.
-        static let overlayCursorBlue = Color(hex: "#9a4800")
+        /// The blue cursor/bubble color used in OverlayWindow.
+        /// Matches the Sparkle brand gradient primary (#0058bc).
+        static let overlayCursorBlue = Color(hex: "#0058bc")
 
         // ── Floating Button Gradient ─────────────────────────────────
 
