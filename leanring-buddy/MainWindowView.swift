@@ -75,13 +75,15 @@ struct MainWindowView: View {
         case space(UUID)
     }
 
-    private var sidebarWidth: CGFloat { isSidebarCollapsed ? 60 : 256 }
+    private var sidebarWidth: CGFloat { isSidebarCollapsed ? 0 : 256 }
 
     var body: some View {
         HStack(spacing: 0) {
-            sidebarView
-                .frame(width: sidebarWidth)
-                .clipped()
+            if !isSidebarCollapsed {
+                sidebarView
+                    .frame(width: sidebarWidth)
+                    .clipped()
+            }
             detailContent
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
@@ -91,216 +93,139 @@ struct MainWindowView: View {
     // MARK: - Sidebar
 
     private var sidebarView: some View {
-        VStack(alignment: isSidebarCollapsed ? .center : .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 0) {
             Spacer().frame(height: 32)
 
             // Logo + collapse toggle
-            if isSidebarCollapsed {
+            HStack(spacing: 12) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(sidebarLogoColor)
+                    .frame(width: 32, height: 32)
+                    .overlay(
+                        Text("V")
+                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                    )
+                Text("Vibecademy")
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .foregroundColor(themeOnSurface)
+                Spacer()
                 Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = false }
+                    withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = true }
                 } label: {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(sidebarLogoColor)
-                        .frame(width: 32, height: 32)
-                        .overlay(
-                            Text("V")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(neutralGray400)
+                        .frame(width: 28, height: 28)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                .fill(Color.clear)
                         )
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .nativeTooltip("Expand sidebar")
+                .nativeTooltip("Collapse sidebar")
                 .onHover { hovering in
                     if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                 }
-                .padding(.bottom, 16)
-            } else {
-                HStack(spacing: 12) {
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(sidebarLogoColor)
-                        .frame(width: 32, height: 32)
-                        .overlay(
-                            Text("V")
-                                .font(.system(size: 16, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                        )
-                    Text("Vibecademy")
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
-                        .foregroundColor(themeOnSurface)
-                    Spacer()
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = true }
-                    } label: {
-                        Image(systemName: "sidebar.left")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(neutralGray400)
-                            .frame(width: 28, height: 28)
-                            .background(
-                                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                    .fill(Color.clear)
-                            )
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .nativeTooltip("Collapse sidebar")
-                    .onHover { hovering in
-                        if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 16)
             }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 16)
 
             // Search
-            if isSidebarCollapsed {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = false }
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 14))
-                        .foregroundColor(neutralGray400)
-                        .frame(width: 40, height: 36)
-                        .background(
-                            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                .fill(themeSurfaceContainerHigh)
-                        )
+            HStack(spacing: 8) {
+                Image(systemName: "magnifyingglass")
+                    .font(.system(size: 13))
+                    .foregroundColor(neutralGray400)
+                TextField("Search sessions...", text: $searchText)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 12))
+                Spacer()
+                HStack(spacing: 2) {
+                    monoKeycap("⌘")
+                    monoKeycap("K")
                 }
-                .buttonStyle(.plain)
-                .nativeTooltip("Search  ⌘K")
-                .onHover { hovering in
-                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-                }
-                .padding(.bottom, 16)
-            } else {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 13))
-                        .foregroundColor(neutralGray400)
-                    TextField("Search sessions...", text: $searchText)
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 12))
-                    Spacer()
-                    HStack(spacing: 2) {
-                        monoKeycap("⌘")
-                        monoKeycap("K")
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(themeSurfaceContainerHigh)
-                )
-                .padding(.horizontal, 12)
-                .padding(.bottom, 24)
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(themeSurfaceContainerHigh)
+            )
+            .padding(.horizontal, 12)
+            .padding(.bottom, 24)
 
             // Nav items
             VStack(spacing: 2) {
                 sidebarNavRow(item: .home, icon: "house.fill", label: "Home")
                 sidebarNavRow(item: .chat, icon: "bubble.left.and.bubble.right", label: "Chat")
             }
-            .padding(.horizontal, isSidebarCollapsed ? 4 : 8)
+            .padding(.horizontal, 8)
 
             // Spaces
-            if isSidebarCollapsed {
-                VStack(spacing: 2) {
-                    ForEach(conversationStore.spaces) { space in
-                        sidebarNavRow(item: .space(space.id), icon: "folder", label: space.name)
-                            .contextMenu {
-                                Button("Delete Space", role: .destructive) {
-                                    conversationStore.deleteSpace(space.id)
-                                    if case .space(let id) = sidebarSelection, id == space.id {
-                                        sidebarSelection = .home
-                                    }
+            VStack(alignment: .leading, spacing: 2) {
+                Text("SPACES")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundColor(neutralGray400)
+                    .tracking(2)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 32)
+                    .padding(.bottom, 8)
+
+                ForEach(conversationStore.spaces) { space in
+                    sidebarNavRow(item: .space(space.id), icon: "folder", label: space.name)
+                        .contextMenu {
+                            Button("Delete Space", role: .destructive) {
+                                conversationStore.deleteSpace(space.id)
+                                if case .space(let id) = sidebarSelection, id == space.id {
+                                    sidebarSelection = .home
                                 }
                             }
-                    }
-
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = false }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) {
-                            isCreatingSpace = true
                         }
-                    } label: {
+                }
+
+                if isCreatingSpace {
+                    HStack(spacing: 8) {
+                        Image(systemName: "folder")
+                            .font(.system(size: 13))
+                            .foregroundColor(neutralGray400)
+                            .frame(width: 20)
+                        TextField("Space name", text: $newSpaceName, onCommit: {
+                            let trimmedName = newSpaceName.trimmingCharacters(in: .whitespaces)
+                            if !trimmedName.isEmpty {
+                                conversationStore.createSpace(name: trimmedName)
+                            }
+                            newSpaceName = ""
+                            isCreatingSpace = false
+                        })
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 12))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
+                }
+
+                Button {
+                    isCreatingSpace = true
+                } label: {
+                    HStack(spacing: 8) {
                         Image(systemName: "folder.badge.plus")
-                            .font(.system(size: 14))
+                            .font(.system(size: 13))
                             .foregroundColor(neutralGray400.opacity(0.6))
-                            .frame(width: 40, height: 36)
-                    }
-                    .buttonStyle(.plain)
-                    .nativeTooltip("Add folder")
-                    .onHover { hovering in
-                        if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-                    }
-                }
-                .padding(.horizontal, 4)
-                .padding(.top, 16)
-            } else {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("SPACES")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(neutralGray400)
-                        .tracking(2)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 32)
-                        .padding(.bottom, 8)
-
-                    ForEach(conversationStore.spaces) { space in
-                        sidebarNavRow(item: .space(space.id), icon: "folder", label: space.name)
-                            .contextMenu {
-                                Button("Delete Space", role: .destructive) {
-                                    conversationStore.deleteSpace(space.id)
-                                    if case .space(let id) = sidebarSelection, id == space.id {
-                                        sidebarSelection = .home
-                                    }
-                                }
-                            }
-                    }
-
-                    if isCreatingSpace {
-                        HStack(spacing: 8) {
-                            Image(systemName: "folder")
-                                .font(.system(size: 13))
-                                .foregroundColor(neutralGray400)
-                                .frame(width: 20)
-                            TextField("Space name", text: $newSpaceName, onCommit: {
-                                let trimmedName = newSpaceName.trimmingCharacters(in: .whitespaces)
-                                if !trimmedName.isEmpty {
-                                    conversationStore.createSpace(name: trimmedName)
-                                }
-                                newSpaceName = ""
-                                isCreatingSpace = false
-                            })
-                            .textFieldStyle(.plain)
+                            .frame(width: 20)
+                        Text("Add folder")
                             .font(.system(size: 12))
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
+                            .foregroundColor(neutralGray400.opacity(0.6))
                     }
-
-                    Button {
-                        isCreatingSpace = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "folder.badge.plus")
-                                .font(.system(size: 13))
-                                .foregroundColor(neutralGray400.opacity(0.6))
-                                .frame(width: 20)
-                            Text("Add folder")
-                                .font(.system(size: 12))
-                                .foregroundColor(neutralGray400.opacity(0.6))
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 6)
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { hovering in
-                        if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 6)
                 }
-                .padding(.horizontal, 8)
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
             }
+            .padding(.horizontal, 8)
 
             Spacer()
 
@@ -314,127 +239,81 @@ struct MainWindowView: View {
 
     private var sidebarBottom: some View {
         VStack(spacing: 2) {
-            Divider().opacity(0.3).padding(.horizontal, isSidebarCollapsed ? 8 : 12)
+            Divider().opacity(0.3).padding(.horizontal, 12)
 
-            if isSidebarCollapsed {
-                // Collapsed: icon-only buttons stacked vertically
-                Button {
-                    companionManager.setSparkleCursorEnabled(!companionManager.isSparkleCursorEnabled)
-                } label: {
-                    ZStack(alignment: .topTrailing) {
-                        Image(systemName: "sparkle")
-                            .font(.system(size: 14))
-                            .foregroundColor(companionManager.isSparkleCursorEnabled ? themeTertiary : neutralGray600)
-                            .frame(width: 40, height: 36)
-                        Circle()
-                            .fill(sparkleStatusColor)
-                            .frame(width: 6, height: 6)
-                            .offset(x: -6, y: 6)
-                    }
-                }
-                .buttonStyle(.plain)
-                .nativeTooltip("Sparkle — \(sparkleStatusShortLabel)")
-                .onHover { hovering in
-                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-                }
-
-                Image(systemName: "person.circle")
-                    .font(.system(size: 14))
-                    .foregroundColor(neutralGray600)
-                    .frame(width: 40, height: 36)
-                    .nativeTooltip("Profile — Dante")
-
-                Button {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
-                        NSWorkspace.shared.open(url)
-                    }
-                } label: {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 14))
-                        .foregroundColor(neutralGray600)
-                        .frame(width: 40, height: 36)
-                }
-                .buttonStyle(.plain)
-                .nativeTooltip("Settings")
-                .onHover { hovering in
-                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-                }
-            } else {
-                // Expanded: full rows
-                Button {
-                    companionManager.setSparkleCursorEnabled(!companionManager.isSparkleCursorEnabled)
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "sparkle")
-                            .font(.system(size: 14))
-                            .foregroundColor(companionManager.isSparkleCursorEnabled ? themeTertiary : neutralGray600)
-                        Text("Sparkle")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(neutralGray600)
-                        Spacer()
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(sparkleStatusColor)
-                                .frame(width: 7, height: 7)
-                            Text(sparkleStatusShortLabel)
-                                .font(.system(size: 10, weight: .medium))
-                                .foregroundColor(neutralGray500)
-                        }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .onHover { hovering in
-                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-                }
-
+            Button {
+                companionManager.setSparkleCursorEnabled(!companionManager.isSparkleCursorEnabled)
+            } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: "person.circle")
+                    Image(systemName: "sparkle")
                         .font(.system(size: 14))
-                        .foregroundColor(neutralGray600)
-                    Text("Profile")
+                        .foregroundColor(companionManager.isSparkleCursorEnabled ? themeTertiary : neutralGray600)
+                    Text("Sparkle")
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(neutralGray600)
                     Spacer()
-                    Text("Dante")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(themePrimary)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule().fill(themePrimary.opacity(0.1))
-                        )
+                    HStack(spacing: 6) {
+                        Circle()
+                            .fill(sparkleStatusColor)
+                            .frame(width: 7, height: 7)
+                        Text(sparkleStatusShortLabel)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(neutralGray500)
+                    }
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
 
-                Button {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
-                        NSWorkspace.shared.open(url)
-                    }
-                } label: {
-                    HStack(spacing: 12) {
-                        Image(systemName: "gearshape")
-                            .font(.system(size: 14))
-                            .foregroundColor(neutralGray600)
-                        Text("Settings")
-                            .font(.system(size: 13, weight: .medium))
-                            .foregroundColor(neutralGray600)
-                        Spacer()
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .contentShape(Rectangle())
+            HStack(spacing: 12) {
+                Image(systemName: "person.circle")
+                    .font(.system(size: 14))
+                    .foregroundColor(neutralGray600)
+                Text("Profile")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(neutralGray600)
+                Spacer()
+                Text("Dante")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(themePrimary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule().fill(themePrimary.opacity(0.1))
+                    )
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+
+            Button {
+                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
+                    NSWorkspace.shared.open(url)
                 }
-                .buttonStyle(.plain)
-                .onHover { hovering in
-                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "gearshape")
+                        .font(.system(size: 14))
+                        .foregroundColor(neutralGray600)
+                    Text("Settings")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(neutralGray600)
+                    Spacer()
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
         }
-        .padding(.horizontal, isSidebarCollapsed ? 4 : 8)
+        .padding(.horizontal, 8)
         .padding(.bottom, 12)
     }
 
@@ -445,52 +324,30 @@ struct MainWindowView: View {
         let isHovered = hoveredSidebarItem == item
         let activeColor = themeOnSurface
 
-        return Group {
-            if isSidebarCollapsed {
-                Image(systemName: icon)
-                    .font(.system(size: 16))
-                    .foregroundColor(isSelected ? activeColor : neutralGray600)
-                    .frame(width: 40, height: 36)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8, style: .continuous)
-                            .fill(isHovered ? sidebarHoverBg.opacity(0.3) : Color.clear)
-                    )
-                    .overlay(alignment: .leading) {
-                        if isSelected {
-                            Rectangle()
-                                .fill(themePrimary)
-                                .frame(width: 2)
-                        }
-                    }
-                    .opacity(isSelected || isHovered ? 1.0 : 0.7)
-                    .nativeTooltip(label)
-            } else {
-                HStack(spacing: 12) {
-                    Image(systemName: icon)
-                        .font(.system(size: 14))
-                        .foregroundColor(isSelected ? activeColor : neutralGray600)
-                    Text(label)
-                        .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                        .foregroundColor(isSelected ? activeColor : neutralGray600)
-                    Spacer()
-                }
-                .padding(.leading, 16)
-                .padding(.trailing, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(isHovered ? sidebarHoverBg.opacity(0.3) : Color.clear)
-                )
-                .overlay(alignment: .leading) {
-                    if isSelected {
-                        Rectangle()
-                            .fill(themePrimary)
-                            .frame(width: 2)
-                    }
-                }
-                .opacity(isSelected || isHovered ? 1.0 : 0.7)
+        return HStack(spacing: 12) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(isSelected ? activeColor : neutralGray600)
+            Text(label)
+                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                .foregroundColor(isSelected ? activeColor : neutralGray600)
+            Spacer()
+        }
+        .padding(.leading, 16)
+        .padding(.trailing, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHovered ? sidebarHoverBg.opacity(0.3) : Color.clear)
+        )
+        .overlay(alignment: .leading) {
+            if isSelected {
+                Rectangle()
+                    .fill(themePrimary)
+                    .frame(width: 2)
             }
         }
+        .opacity(isSelected || isHovered ? 1.0 : 0.7)
         .contentShape(Rectangle())
         .onTapGesture {
             sidebarSelection = item
@@ -705,6 +562,23 @@ struct MainWindowView: View {
 
     private var topAppBar: some View {
         HStack {
+            if isSidebarCollapsed {
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = false }
+                } label: {
+                    Image(systemName: "sidebar.left")
+                        .font(.system(size: 14, weight: .medium))
+                        .foregroundColor(themeOnSurfaceVariant)
+                        .frame(width: 32, height: 32)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .nativeTooltip("Expand sidebar")
+                .onHover { hovering in
+                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
+            }
+
             Spacer()
 
             HStack(spacing: 16) {
