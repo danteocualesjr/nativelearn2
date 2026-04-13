@@ -68,10 +68,12 @@ struct MainWindowView: View {
     @State private var editingSummary: String = ""
     @State private var editingToolType: ConversationToolType = .webApp
     @AppStorage("sidebarCollapsed") private var isSidebarCollapsed = false
+    @AppStorage("userDisplayName") private var userDisplayName = "Dante"
 
     enum SidebarItem: Hashable {
         case home
         case chat
+        case profile
         case space(UUID)
     }
 
@@ -270,25 +272,48 @@ struct MainWindowView: View {
                 if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
 
-            HStack(spacing: 12) {
-                Image(systemName: "person.circle")
-                    .font(.system(size: 14))
-                    .foregroundColor(neutralGray600)
-                Text("Profile")
-                    .font(.system(size: 13, weight: .medium))
-                    .foregroundColor(neutralGray600)
-                Spacer()
-                Text("Dante")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundColor(themePrimary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule().fill(themePrimary.opacity(0.1))
-                    )
+            Button {
+                sidebarSelection = .profile
+                selectedConversationId = nil
+            } label: {
+                HStack(spacing: 12) {
+                    Image(systemName: "person.circle")
+                        .font(.system(size: 14))
+                        .foregroundColor(sidebarSelection == .profile ? themeOnSurface : neutralGray600)
+                    Text("Profile")
+                        .font(.system(size: 13, weight: sidebarSelection == .profile ? .semibold : .medium))
+                        .foregroundColor(sidebarSelection == .profile ? themeOnSurface : neutralGray600)
+                    Spacer()
+                    Text(userDisplayName)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(themePrimary)
+                        .lineLimit(1)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            Capsule().fill(themePrimary.opacity(0.1))
+                        )
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(sidebarSelection == .profile ? sidebarHoverBg.opacity(0.35) : Color.clear)
+                )
+                .overlay(alignment: .leading) {
+                    if sidebarSelection == .profile {
+                        Rectangle()
+                            .fill(themePrimary)
+                            .frame(width: 2)
+                    }
+                }
+                .contentShape(Rectangle())
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .buttonStyle(.plain)
+            .nativeTooltip("Profile and display name")
+            .onHover { hovering in
+                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
 
             Button {
                 if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
@@ -420,6 +445,14 @@ struct MainWindowView: View {
         return "Off"
     }
 
+    private var userInitialLetterForToolbar: String {
+        let trimmed = userDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let first = trimmed.first {
+            return String(first).uppercased()
+        }
+        return "?"
+    }
+
     // MARK: - Detail Routing
 
     @ViewBuilder
@@ -431,6 +464,8 @@ struct MainWindowView: View {
                 conversationStore: conversationStore,
                 onBack: { selectedConversationId = nil }
             )
+        } else if sidebarSelection == .profile {
+            ProfileDetailView(userDisplayName: $userDisplayName)
         } else {
             dashboardView
         }
@@ -440,8 +475,10 @@ struct MainWindowView: View {
 
     private var dashboardView: some View {
         let spaceFilter: UUID? = {
-            if case .space(let id) = sidebarSelection { return id }
-            return nil
+            switch sidebarSelection {
+            case .space(let id): return id
+            case .home, .chat, .profile: return nil
+            }
         }()
 
         let allGroups = conversationStore.conversationsGroupedByDate(spaceId: spaceFilter)
@@ -610,7 +647,7 @@ struct MainWindowView: View {
                     .fill(themePrimary)
                     .frame(width: 32, height: 32)
                     .overlay(
-                        Text("D")
+                        Text(userInitialLetterForToolbar)
                             .font(.system(size: 13, weight: .bold, design: .rounded))
                             .foregroundColor(.white)
                     )
@@ -626,7 +663,7 @@ struct MainWindowView: View {
 
     private var welcomeHeader: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text("Welcome back, Dante")
+            Text("Welcome back, \(userDisplayName)")
                 .font(.system(size: 34, weight: .bold, design: .rounded))
                 .foregroundColor(themeOnSurface)
                 .tracking(-0.5)
@@ -1453,6 +1490,73 @@ struct MainWindowView: View {
         ]
         let index = abs(conversation.id.hashValue) % gradients.count
         return gradients[index]
+    }
+}
+
+// MARK: - Profile Detail
+
+private struct ProfileDetailView: View {
+    @Binding var userDisplayName: String
+
+    private var profileInitialLetter: String {
+        let trimmed = userDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let first = trimmed.first {
+            return String(first).uppercased()
+        }
+        return "?"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Profile")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundColor(themeOnSurface)
+                Spacer()
+            }
+            .frame(height: 52)
+            .padding(.horizontal, 32)
+            .background(themeSurface.opacity(0.8))
+            .background(.ultraThinMaterial)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    HStack {
+                        Spacer()
+                        ZStack {
+                            Circle()
+                                .fill(themePrimary)
+                                .frame(width: 88, height: 88)
+                            Text(profileInitialLetter)
+                                .font(.system(size: 36, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                        }
+                        Spacer()
+                    }
+                    .padding(.top, 32)
+
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Display name")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(themeOnSurfaceVariant)
+                        TextField("Your name", text: $userDisplayName)
+                            .textFieldStyle(.plain)
+                            .font(.system(size: 16))
+                            .padding(12)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .fill(themeSurfaceContainerHigh)
+                            )
+                        Text("Shown in the sidebar, welcome message, and toolbar.")
+                            .font(.system(size: 12))
+                            .foregroundColor(themeOnSurfaceVariant.opacity(0.8))
+                    }
+                    .padding(.horizontal, 32)
+                }
+                .padding(.bottom, 40)
+            }
+        }
+        .background(themeSurface)
     }
 }
 
