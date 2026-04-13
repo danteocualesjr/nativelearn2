@@ -8,6 +8,7 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
 
 // MARK: - Theme Colors (Material Design 3 — Vibe Academy light palette)
 
@@ -69,6 +70,7 @@ struct MainWindowView: View {
     @State private var editingToolType: ConversationToolType = .webApp
     @AppStorage("sidebarCollapsed") private var isSidebarCollapsed = false
     @AppStorage("userDisplayName") private var userDisplayName = "Dante"
+    @AppStorage("profilePhotoPath") private var profilePhotoRelativePath = ""
 
     enum SidebarItem: Hashable {
         case home
@@ -78,6 +80,15 @@ struct MainWindowView: View {
     }
 
     private var sidebarWidth: CGFloat { isSidebarCollapsed ? 0 : 256 }
+
+    private var profilePhotoImage: NSImage? {
+        guard !profilePhotoRelativePath.isEmpty else { return nil }
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let url = appSupport
+            .appendingPathComponent("Vibecademy/ProfilePhotos", isDirectory: true)
+            .appendingPathComponent(profilePhotoRelativePath)
+        return NSImage(contentsOf: url)
+    }
 
     var body: some View {
         HStack(spacing: 0) {
@@ -277,9 +288,17 @@ struct MainWindowView: View {
                 selectedConversationId = nil
             } label: {
                 HStack(spacing: 12) {
-                    Image(systemName: "person.circle")
-                        .font(.system(size: 14))
-                        .foregroundColor(sidebarSelection == .profile ? themeOnSurface : neutralGray600)
+                    if let photo = profilePhotoImage {
+                        Image(nsImage: photo)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 22, height: 22)
+                            .clipShape(Circle())
+                    } else {
+                        Image(systemName: "person.circle")
+                            .font(.system(size: 14))
+                            .foregroundColor(sidebarSelection == .profile ? themeOnSurface : neutralGray600)
+                    }
                     Text("Profile")
                         .font(.system(size: 13, weight: sidebarSelection == .profile ? .semibold : .medium))
                         .foregroundColor(sidebarSelection == .profile ? themeOnSurface : neutralGray600)
@@ -465,7 +484,11 @@ struct MainWindowView: View {
                 onBack: { selectedConversationId = nil }
             )
         } else if sidebarSelection == .profile {
-            ProfileDetailView(userDisplayName: $userDisplayName)
+            ProfileDetailView(
+                userDisplayName: $userDisplayName,
+                companionManager: companionManager,
+                conversationStore: conversationStore
+            )
         } else {
             dashboardView
         }
@@ -643,14 +666,22 @@ struct MainWindowView: View {
                     .font(.system(size: 14))
                     .foregroundColor(themeOnSurfaceVariant)
 
-                Circle()
-                    .fill(themePrimary)
-                    .frame(width: 32, height: 32)
-                    .overlay(
-                        Text(userInitialLetterForToolbar)
-                            .font(.system(size: 13, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    )
+                if let photo = profilePhotoImage {
+                    Image(nsImage: photo)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 32, height: 32)
+                        .clipShape(Circle())
+                } else {
+                    Circle()
+                        .fill(themePrimary)
+                        .frame(width: 32, height: 32)
+                        .overlay(
+                            Text(userInitialLetterForToolbar)
+                                .font(.system(size: 13, weight: .bold, design: .rounded))
+                                .foregroundColor(.white)
+                        )
+                }
             }
         }
         .padding(.horizontal, 32)
@@ -1497,13 +1528,57 @@ struct MainWindowView: View {
 
 private struct ProfileDetailView: View {
     @Binding var userDisplayName: String
+    @ObservedObject var companionManager: CompanionManager
+    @ObservedObject var conversationStore: ConversationStore
+
+    @State private var draftDisplayName: String = ""
+    @State private var draftEmail: String = ""
+    @State private var showingSaveConfirmation = false
+    @State private var isPickingPhoto = false
+    @State private var showingDeleteAllConfirmation = false
+    @AppStorage("userEmail") private var persistedEmail = ""
+    @AppStorage("profilePhotoPath") private var profilePhotoRelativePath = ""
+
+    private static let profilePhotosDirectory: URL = {
+        let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
+        let directory = appSupport.appendingPathComponent("Vibecademy/ProfilePhotos", isDirectory: true)
+        try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory
+    }()
+
+    private var profilePhotoFullURL: URL? {
+        guard !profilePhotoRelativePath.isEmpty else { return nil }
+        return Self.profilePhotosDirectory.appendingPathComponent(profilePhotoRelativePath)
+    }
+
+    private var profilePhotoImage: NSImage? {
+        guard let url = profilePhotoFullURL else { return nil }
+        return NSImage(contentsOf: url)
+    }
 
     private var profileInitialLetter: String {
-        let trimmed = userDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let first = trimmed.first {
+        let name = draftDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if let first = name.first {
             return String(first).uppercased()
         }
         return "?"
+    }
+
+    private var totalExchangeCount: Int {
+        conversationStore.conversations.reduce(0) { $0 + $1.exchanges.count }
+    }
+
+    private var memberSinceLabel: String {
+        guard let oldest = conversationStore.conversations.map({ $0.createdAt }).min() else {
+            return "Today"
+        }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMMM yyyy"
+        return formatter.string(from: oldest)
+    }
+
+    private var hasUnsavedChanges: Bool {
+        draftDisplayName != userDisplayName || draftEmail != persistedEmail
     }
 
     var body: some View {
@@ -1513,6 +1588,17 @@ private struct ProfileDetailView: View {
                     .font(.system(size: 18, weight: .semibold, design: .rounded))
                     .foregroundColor(themeOnSurface)
                 Spacer()
+
+                if showingSaveConfirmation {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("Saved")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(.green)
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .trailing)))
+                }
             }
             .frame(height: 52)
             .padding(.horizontal, 32)
@@ -1520,43 +1606,516 @@ private struct ProfileDetailView: View {
             .background(.ultraThinMaterial)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    HStack {
-                        Spacer()
-                        ZStack {
-                            Circle()
-                                .fill(themePrimary)
-                                .frame(width: 88, height: 88)
-                            Text(profileInitialLetter)
-                                .font(.system(size: 36, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                        }
-                        Spacer()
-                    }
-                    .padding(.top, 32)
+                VStack(alignment: .leading, spacing: 0) {
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Display name")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(themeOnSurfaceVariant)
-                        TextField("Your name", text: $userDisplayName)
-                            .textFieldStyle(.plain)
-                            .font(.system(size: 16))
-                            .padding(12)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                    .fill(themeSurfaceContainerHigh)
-                            )
-                        Text("Shown in the sidebar, welcome message, and toolbar.")
-                            .font(.system(size: 12))
-                            .foregroundColor(themeOnSurfaceVariant.opacity(0.8))
+                    // MARK: Avatar + Photo
+
+                    profileAvatarSection
+                        .padding(.top, 32)
+                        .padding(.bottom, 32)
+
+                    // MARK: Personal Info
+
+                    profileSectionHeader("Personal Information")
+
+                    VStack(alignment: .leading, spacing: 20) {
+                        profileTextField(
+                            label: "Display name",
+                            placeholder: "Your name",
+                            text: $draftDisplayName,
+                            hint: "Shown in the sidebar, welcome message, and toolbar."
+                        )
+
+                        profileTextField(
+                            label: "Email",
+                            placeholder: "you@example.com",
+                            text: $draftEmail,
+                            hint: "Optional. Used for account recovery and notifications."
+                        )
                     }
                     .padding(.horizontal, 32)
+                    .padding(.bottom, 12)
+
+                    saveButton
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 40)
+
+                    Divider().padding(.horizontal, 32).padding(.bottom, 24)
+
+                    // MARK: Preferences
+
+                    profileSectionHeader("Preferences")
+
+                    preferredModelPicker
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 40)
+
+                    Divider().padding(.horizontal, 32).padding(.bottom, 24)
+
+                    // MARK: Stats
+
+                    profileSectionHeader("Your Activity")
+
+                    statsGrid
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 40)
+
+                    Divider().padding(.horizontal, 32).padding(.bottom, 24)
+
+                    // MARK: Keyboard Shortcuts
+
+                    profileSectionHeader("Keyboard Shortcuts")
+
+                    shortcutsReference
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 40)
+
+                    Divider().padding(.horizontal, 32).padding(.bottom, 24)
+
+                    // MARK: Danger Zone
+
+                    profileSectionHeader("Danger Zone")
+
+                    dangerZone
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 60)
                 }
-                .padding(.bottom, 40)
             }
         }
         .background(themeSurface)
+        .onAppear {
+            draftDisplayName = userDisplayName
+            draftEmail = persistedEmail
+        }
+    }
+
+    // MARK: - Avatar Section
+
+    private var profileAvatarSection: some View {
+        HStack {
+            Spacer()
+            VStack(spacing: 12) {
+                ZStack {
+                    if let photo = profilePhotoImage {
+                        Image(nsImage: photo)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 96, height: 96)
+                            .clipShape(Circle())
+                    } else {
+                        Circle()
+                            .fill(themePrimary)
+                            .frame(width: 96, height: 96)
+                        Text(profileInitialLetter)
+                            .font(.system(size: 38, weight: .bold, design: .rounded))
+                            .foregroundColor(.white)
+                    }
+                }
+
+                HStack(spacing: 12) {
+                    Button {
+                        pickProfilePhoto()
+                    } label: {
+                        Text(profilePhotoImage == nil ? "Upload Photo" : "Change Photo")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(themeTertiary)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(themeTertiary.opacity(0.1))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+
+                    if profilePhotoImage != nil {
+                        Button {
+                            removeProfilePhoto()
+                        } label: {
+                            Text("Remove")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(Color(hex: "#dc2626"))
+                                .padding(.horizontal, 14)
+                                .padding(.vertical, 6)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                        .fill(Color(hex: "#dc2626").opacity(0.08))
+                                )
+                        }
+                        .buttonStyle(.plain)
+                        .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+                    }
+                }
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - Save Button
+
+    private var saveButton: some View {
+        HStack {
+            Spacer()
+            Button {
+                saveProfile()
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 13, weight: .medium))
+                    Text("Save Changes")
+                        .font(.system(size: 14, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(hasUnsavedChanges ? themeTertiary : neutralGray400)
+                )
+            }
+            .buttonStyle(.plain)
+            .disabled(!hasUnsavedChanges)
+            .onHover { h in
+                if hasUnsavedChanges {
+                    if h { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
+            }
+            Spacer()
+        }
+    }
+
+    // MARK: - Preferred Model Picker
+
+    private var preferredModelPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Default AI model")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(themeOnSurfaceVariant)
+
+            HStack(spacing: 12) {
+                modelPickerButton(
+                    label: "Sonnet 4.6",
+                    subtitle: "Fast & capable",
+                    modelId: "claude-sonnet-4-6",
+                    icon: "hare"
+                )
+                modelPickerButton(
+                    label: "Opus 4.6",
+                    subtitle: "Most intelligent",
+                    modelId: "claude-opus-4-6",
+                    icon: "brain.head.profile"
+                )
+            }
+
+            Text("Controls which model Sparkle uses for voice responses.")
+                .font(.system(size: 12))
+                .foregroundColor(themeOnSurfaceVariant.opacity(0.8))
+        }
+    }
+
+    private func modelPickerButton(label: String, subtitle: String, modelId: String, icon: String) -> some View {
+        let isSelected = companionManager.selectedModel == modelId
+        return Button {
+            companionManager.setSelectedModel(modelId)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundColor(isSelected ? themeTertiary : neutralGray500)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(label)
+                        .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
+                        .foregroundColor(isSelected ? themeOnSurface : neutralGray600)
+                    Text(subtitle)
+                        .font(.system(size: 11))
+                        .foregroundColor(themeOnSurfaceVariant.opacity(0.7))
+                }
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(themeTertiary)
+                        .font(.system(size: 16))
+                }
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? themeTertiary.opacity(0.08) : themeSurfaceContainerHigh)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isSelected ? themeTertiary.opacity(0.3) : Color.clear, lineWidth: 1.5)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+    }
+
+    // MARK: - Stats Grid
+
+    private var statsGrid: some View {
+        let sessionCount = conversationStore.conversations.count
+        let spaceCount = conversationStore.spaces.count
+
+        return LazyVGrid(
+            columns: [
+                GridItem(.flexible(), spacing: 16),
+                GridItem(.flexible(), spacing: 16),
+                GridItem(.flexible(), spacing: 16)
+            ],
+            spacing: 16
+        ) {
+            statCard(value: "\(sessionCount)", label: "Sessions", icon: "bubble.left.and.bubble.right")
+            statCard(value: "\(totalExchangeCount)", label: "Exchanges", icon: "text.bubble")
+            statCard(value: "\(spaceCount)", label: "Spaces", icon: "folder")
+            statCard(value: memberSinceLabel, label: "Member since", icon: "calendar")
+            statCard(
+                value: companionManager.selectedModel == "claude-opus-4-6" ? "Opus 4.6" : "Sonnet 4.6",
+                label: "Current model",
+                icon: "cpu"
+            )
+            statCard(
+                value: companionManager.isSparkleCursorEnabled ? "Active" : "Off",
+                label: "Sparkle status",
+                icon: "sparkle"
+            )
+        }
+    }
+
+    private func statCard(value: String, label: String, icon: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 14))
+                .foregroundColor(themeTertiary)
+            Text(value)
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(themeOnSurface)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Text(label)
+                .font(.system(size: 12))
+                .foregroundColor(themeOnSurfaceVariant)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(themeSurfaceContainerHigh)
+        )
+    }
+
+    // MARK: - Keyboard Shortcuts
+
+    private var shortcutsReference: some View {
+        VStack(spacing: 0) {
+            shortcutRow(keys: ["⌃", "⌥"], description: "Push-to-talk (hold)", isFirst: true)
+            shortcutRow(keys: ["⌘", "K"], description: "Search sessions")
+            shortcutRow(keys: ["⌘", ","], description: "Open Settings")
+            shortcutRow(keys: ["⌘", "Q"], description: "Quit Vibecademy", isLast: true)
+        }
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(themeOutlineVariant.opacity(0.3), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private func shortcutRow(keys: [String], description: String, isFirst: Bool = false, isLast: Bool = false) -> some View {
+        HStack {
+            Text(description)
+                .font(.system(size: 13))
+                .foregroundColor(themeOnSurface)
+            Spacer()
+            HStack(spacing: 4) {
+                ForEach(keys, id: \.self) { key in
+                    Text(key)
+                        .font(.system(size: 11, weight: .medium, design: .monospaced))
+                        .foregroundColor(neutralGray600)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .fill(themeSurfaceContainerHigh)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 5, style: .continuous)
+                                .stroke(themeOutlineVariant.opacity(0.3), lineWidth: 0.5)
+                        )
+                }
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(themeSurfaceContainerLowest)
+        .overlay(alignment: .bottom) {
+            if !isLast {
+                Divider().opacity(0.3)
+            }
+        }
+    }
+
+    // MARK: - Danger Zone
+
+    private var dangerZone: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                Button {
+                    showingDeleteAllConfirmation = true
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "trash")
+                            .font(.system(size: 13))
+                        Text("Delete All Conversations")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundColor(Color(hex: "#dc2626"))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(hex: "#dc2626").opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color(hex: "#dc2626").opacity(0.2), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+                .alert("Delete all conversations?", isPresented: $showingDeleteAllConfirmation) {
+                    Button("Cancel", role: .cancel) { }
+                    Button("Delete All", role: .destructive) {
+                        deleteAllConversations()
+                    }
+                } message: {
+                    Text("This will permanently remove all \(conversationStore.conversations.count) conversations. This cannot be undone.")
+                }
+
+                Button {
+                    resetProfileToDefaults()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.counterclockwise")
+                            .font(.system(size: 13))
+                        Text("Reset Profile")
+                            .font(.system(size: 13, weight: .medium))
+                    }
+                    .foregroundColor(Color(hex: "#dc2626"))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(hex: "#dc2626").opacity(0.08))
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color(hex: "#dc2626").opacity(0.2), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+                .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+            }
+
+            Text("These actions are permanent and cannot be reversed.")
+                .font(.system(size: 12))
+                .foregroundColor(themeOnSurfaceVariant.opacity(0.6))
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func profileSectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 14, weight: .semibold, design: .rounded))
+            .foregroundColor(themeOnSurface)
+            .padding(.horizontal, 32)
+            .padding(.bottom, 16)
+    }
+
+    private func profileTextField(label: String, placeholder: String, text: Binding<String>, hint: String) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(label)
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(themeOnSurfaceVariant)
+            TextField(placeholder, text: text)
+                .textFieldStyle(.plain)
+                .font(.system(size: 15))
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(themeSurfaceContainerHigh)
+                )
+            Text(hint)
+                .font(.system(size: 11))
+                .foregroundColor(themeOnSurfaceVariant.opacity(0.7))
+        }
+    }
+
+    // MARK: - Actions
+
+    private func saveProfile() {
+        let trimmedName = draftDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedName.isEmpty {
+            userDisplayName = trimmedName
+            draftDisplayName = trimmedName
+        }
+        persistedEmail = draftEmail.trimmingCharacters(in: .whitespacesAndNewlines)
+        draftEmail = persistedEmail
+
+        withAnimation(.easeInOut(duration: 0.3)) { showingSaveConfirmation = true }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            withAnimation(.easeInOut(duration: 0.3)) { showingSaveConfirmation = false }
+        }
+    }
+
+    private func pickProfilePhoto() {
+        let panel = NSOpenPanel()
+        panel.title = "Choose a profile photo"
+        panel.allowedContentTypes = [.jpeg, .png, .heic]
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+
+        guard panel.runModal() == .OK, let sourceURL = panel.url else { return }
+
+        let fileName = "profile_\(UUID().uuidString).\(sourceURL.pathExtension)"
+        let destinationURL = Self.profilePhotosDirectory.appendingPathComponent(fileName)
+
+        // Remove the old photo file if one exists
+        if let oldURL = profilePhotoFullURL {
+            try? FileManager.default.removeItem(at: oldURL)
+        }
+
+        do {
+            try FileManager.default.copyItem(at: sourceURL, to: destinationURL)
+            profilePhotoRelativePath = fileName
+        } catch {
+            print("⚠️ ProfileDetailView: failed to copy profile photo: \(error)")
+        }
+    }
+
+    private func removeProfilePhoto() {
+        if let url = profilePhotoFullURL {
+            try? FileManager.default.removeItem(at: url)
+        }
+        profilePhotoRelativePath = ""
+    }
+
+    private func deleteAllConversations() {
+        let allIds = conversationStore.conversations.map { $0.id }
+        for conversationId in allIds {
+            conversationStore.deleteConversation(conversationId)
+        }
+    }
+
+    private func resetProfileToDefaults() {
+        userDisplayName = "Dante"
+        draftDisplayName = "Dante"
+        persistedEmail = ""
+        draftEmail = ""
+        removeProfilePhoto()
     }
 }
 
