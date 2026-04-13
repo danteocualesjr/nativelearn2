@@ -10,30 +10,28 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - Theme Colors (Material Design 3 — Vibe Academy light palette)
+// MARK: - Theme Colors (Material Design 3 — Sparkle blue/purple light palette)
 
-private let themePrimary = Color(hex: "#5f5e5e")
-private let themePrimaryContainer = Color(hex: "#e5e2e1")
-private let themeSecondary = Color(hex: "#5f5f5f")
-private let themeSecondaryContainer = Color(hex: "#e4e2e2")
-private let themeTertiary = Color(hex: "#9a4800")
-private let themeTertiaryContainer = Color(hex: "#fa7e1d")
-private let themeSurface = Color(hex: "#f9f9f7")
-private let themeOnSurface = Color(hex: "#2d3432")
-private let themeSurfaceContainer = Color(hex: "#ecefec")
-private let themeSurfaceContainerLow = Color(hex: "#f2f4f2")
-private let themeSurfaceContainerHigh = Color(hex: "#e5e9e6")
+private let themePrimary = Color(hex: "#0058bc")
+private let themePrimaryContainer = Color(hex: "#0070eb")
+private let themeSecondary = Color(hex: "#5d5e63")
+private let themeSecondaryContainer = Color(hex: "#e0dfe4")
+private let themeTertiary = Color(hex: "#0070eb")
+private let themeTertiaryContainer = Color(hex: "#3b82f6")
+private let themeSurface = Color(hex: "#f9f9fe")
+private let themeOnSurface = Color(hex: "#1a1c1f")
+private let themeSurfaceContainer = Color(hex: "#ededf2")
+private let themeSurfaceContainerLow = Color(hex: "#f3f3f8")
+private let themeSurfaceContainerHigh = Color(hex: "#e8e8ed")
 private let themeSurfaceContainerLowest = Color.white
-private let themeOnSurfaceVariant = Color(hex: "#5a605e")
-private let themeOutlineVariant = Color(hex: "#adb3b0")
+private let themeOnSurfaceVariant = Color(hex: "#414755")
+private let themeOutlineVariant = Color(hex: "#c1c6d7")
 
-private let sidebarBg = Color(hex: "#f9f9f7")
-private let sidebarHoverBg = Color(hex: "#dee4e0")
-private let neutralGray400 = Color(hex: "#adb3b0")
-private let neutralGray500 = Color(hex: "#767c79")
-private let neutralGray600 = Color(hex: "#5a605e")
-
-private let sidebarLogoColor = Color(hex: "#C0504D")
+private let sidebarBg = Color(hex: "#f8f9fc").opacity(0.5)
+private let sidebarHoverBg = Color(hex: "#cbd5e1").opacity(0.8)
+private let neutralGray400 = Color(hex: "#94a3b8")
+private let neutralGray500 = Color(hex: "#64748b")
+private let neutralGray600 = Color(hex: "#475569")
 
 // MARK: - Tool Type Colors
 
@@ -111,17 +109,30 @@ struct MainWindowView: View {
 
             // Logo + collapse toggle
             HStack(spacing: 12) {
-                RoundedRectangle(cornerRadius: 8, style: .continuous)
-                    .fill(sidebarLogoColor)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(
+                        LinearGradient(
+                            colors: [themePrimary, themePrimaryContainer],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
                     .frame(width: 32, height: 32)
                     .overlay(
-                        Text("V")
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
+                        Image(systemName: "star.fill")
+                            .font(.system(size: 16, weight: .medium))
                             .foregroundColor(.white)
                     )
-                Text("Vibecademy")
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(themeOnSurface)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Sparkle")
+                        .font(.system(size: 18, weight: .bold))
+                        .foregroundColor(Color(hex: "#0f172a"))
+                        .tracking(-0.3)
+                    Text("PREMIUM EDITION")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(neutralGray400)
+                        .tracking(1.6)
+                }
                 Spacer()
                 Button {
                     withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = true }
@@ -130,10 +141,6 @@ struct MainWindowView: View {
                         .font(.system(size: 13, weight: .medium))
                         .foregroundColor(neutralGray400)
                         .frame(width: 28, height: 28)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .fill(Color.clear)
-                        )
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -170,7 +177,7 @@ struct MainWindowView: View {
 
             // Nav items
             VStack(spacing: 2) {
-                sidebarNavRow(item: .home, icon: "house.fill", label: "Home")
+                sidebarNavRow(item: .home, icon: "house", label: "Home")
                 sidebarNavRow(item: .chat, icon: "bubble.left.and.bubble.right", label: "Chat")
             }
             .padding(.horizontal, 8)
@@ -240,49 +247,51 @@ struct MainWindowView: View {
             }
             .padding(.horizontal, 8)
 
+            // Settings at bottom of nav
+            VStack(spacing: 2) {
+                Button {
+                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
+                        NSWorkspace.shared.open(url)
+                    }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "gearshape")
+                            .font(.system(size: 14))
+                            .foregroundColor(neutralGray500)
+                        Text("Settings")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(neutralGray500)
+                        Spacer()
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(Color.clear)
+                    )
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 4)
+
             Spacer()
 
             // Bottom section
             sidebarBottom
         }
         .background(sidebarBg)
+        .background(.ultraThinMaterial)
     }
 
     // MARK: - Sidebar Bottom
 
     private var sidebarBottom: some View {
-        VStack(spacing: 2) {
-            Divider().opacity(0.3).padding(.horizontal, 12)
-
-            Button {
-                companionManager.setSparkleCursorEnabled(!companionManager.isSparkleCursorEnabled)
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "sparkle")
-                        .font(.system(size: 14))
-                        .foregroundColor(companionManager.isSparkleCursorEnabled ? themeTertiary : neutralGray600)
-                    Text("Sparkle")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(neutralGray600)
-                    Spacer()
-                    HStack(spacing: 6) {
-                        Circle()
-                            .fill(sparkleStatusColor)
-                            .frame(width: 7, height: 7)
-                        Text(sparkleStatusShortLabel)
-                            .font(.system(size: 10, weight: .medium))
-                            .foregroundColor(neutralGray500)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .onHover { hovering in
-                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-            }
-
+        VStack(spacing: 8) {
             Button {
                 sidebarSelection = .profile
                 selectedConversationId = nil
@@ -292,67 +301,41 @@ struct MainWindowView: View {
                         Image(nsImage: photo)
                             .resizable()
                             .scaledToFill()
-                            .frame(width: 22, height: 22)
+                            .frame(width: 40, height: 40)
                             .clipShape(Circle())
+                            .shadow(color: Color.black.opacity(0.06), radius: 2, y: 1)
                     } else {
-                        Image(systemName: "person.circle")
-                            .font(.system(size: 14))
-                            .foregroundColor(sidebarSelection == .profile ? themeOnSurface : neutralGray600)
-                    }
-                    Text("Profile")
-                        .font(.system(size: 13, weight: sidebarSelection == .profile ? .semibold : .medium))
-                        .foregroundColor(sidebarSelection == .profile ? themeOnSurface : neutralGray600)
-                    Spacer()
-                    Text(userDisplayName)
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(themePrimary)
-                        .lineLimit(1)
-                        .padding(.horizontal, 6)
-                        .padding(.vertical, 2)
-                        .background(
-                            Capsule().fill(themePrimary.opacity(0.1))
-                        )
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .fill(sidebarSelection == .profile ? sidebarHoverBg.opacity(0.35) : Color.clear)
-                )
-                .overlay(alignment: .leading) {
-                    if sidebarSelection == .profile {
-                        Rectangle()
+                        Circle()
                             .fill(themePrimary)
-                            .frame(width: 2)
+                            .frame(width: 40, height: 40)
+                            .overlay(
+                                Text(userInitialLetterForToolbar)
+                                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                                    .foregroundColor(.white)
+                            )
                     }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(userDisplayName)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(Color(hex: "#0f172a"))
+                        Text("Free Tier")
+                            .font(.system(size: 10))
+                            .foregroundColor(neutralGray500)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10))
+                        .foregroundColor(neutralGray400)
                 }
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(Color.white.opacity(0.4))
+                )
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .nativeTooltip("Profile and display name")
-            .onHover { hovering in
-                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-            }
-
-            Button {
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
-                    NSWorkspace.shared.open(url)
-                }
-            } label: {
-                HStack(spacing: 12) {
-                    Image(systemName: "gearshape")
-                        .font(.system(size: 14))
-                        .foregroundColor(neutralGray600)
-                    Text("Settings")
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundColor(neutralGray600)
-                    Spacer()
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
             .onHover { hovering in
                 if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
@@ -366,32 +349,23 @@ struct MainWindowView: View {
     private func sidebarNavRow(item: SidebarItem, icon: String, label: String) -> some View {
         let isSelected = sidebarSelection == item
         let isHovered = hoveredSidebarItem == item
-        let activeColor = themeOnSurface
+        let filledIcon = isSelected ? (icon.hasSuffix(".fill") ? icon : icon + ".fill") : icon
 
         return HStack(spacing: 12) {
-            Image(systemName: icon)
+            Image(systemName: filledIcon)
                 .font(.system(size: 14))
-                .foregroundColor(isSelected ? activeColor : neutralGray600)
+                .foregroundColor(isSelected ? themePrimary : neutralGray500)
             Text(label)
                 .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                .foregroundColor(isSelected ? activeColor : neutralGray600)
+                .foregroundColor(isSelected ? Color(hex: "#0f172a") : neutralGray500)
             Spacer()
         }
-        .padding(.leading, 16)
-        .padding(.trailing, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .fill(isHovered ? sidebarHoverBg.opacity(0.3) : Color.clear)
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isSelected ? sidebarHoverBg : (isHovered ? sidebarHoverBg.opacity(0.5) : Color.clear))
         )
-        .overlay(alignment: .leading) {
-            if isSelected {
-                Rectangle()
-                    .fill(themePrimary)
-                    .frame(width: 2)
-            }
-        }
-        .opacity(isSelected || isHovered ? 1.0 : 0.7)
         .contentShape(Rectangle())
         .onTapGesture {
             sidebarSelection = item
@@ -620,6 +594,8 @@ struct MainWindowView: View {
 
     @State private var isRefreshing = false
 
+    @State private var selectedTopTab = "Dashboard"
+
     private var topAppBar: some View {
         HStack {
             if isSidebarCollapsed {
@@ -639,236 +615,256 @@ struct MainWindowView: View {
                 }
             }
 
+            HStack(spacing: 16) {
+                ForEach(["Dashboard", "Academy", "Insights"], id: \.self) { tabName in
+                    let isActiveTab = selectedTopTab == tabName
+                    Button {
+                        selectedTopTab = tabName
+                    } label: {
+                        Text(tabName)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(isActiveTab ? themePrimary : neutralGray400)
+                            .padding(.bottom, 4)
+                            .overlay(alignment: .bottom) {
+                                if isActiveTab {
+                                    Rectangle()
+                                        .fill(themePrimary)
+                                        .frame(height: 2)
+                                }
+                            }
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+                }
+            }
+
             Spacer()
 
-            HStack(spacing: 16) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.5)) { isRefreshing = true }
-                    conversationStore.reload()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
-                        withAnimation { isRefreshing = false }
-                    }
-                } label: {
-                    Image(systemName: "arrow.clockwise")
-                        .font(.system(size: 14, weight: .medium))
-                        .foregroundColor(themeOnSurfaceVariant)
-                        .rotationEffect(.degrees(isRefreshing ? 360 : 0))
-                        .animation(.easeInOut(duration: 0.5), value: isRefreshing)
+            HStack(spacing: 12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 12))
+                        .foregroundColor(neutralGray400)
+                    TextField("Search resources...", text: .constant(""))
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .frame(width: 160)
                 }
-                .buttonStyle(.plain)
-                .nativeTooltip("Refresh")
-                .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(
+                    Capsule()
+                        .fill(themeSurfaceContainerHigh)
+                )
 
-                Image(systemName: "bell")
-                    .font(.system(size: 14))
-                    .foregroundColor(themeOnSurfaceVariant)
-                Image(systemName: "text.book.closed")
-                    .font(.system(size: 14))
-                    .foregroundColor(themeOnSurfaceVariant)
+                HStack(spacing: 12) {
+                    Button {
+                        companionManager.setSparkleCursorEnabled(!companionManager.isSparkleCursorEnabled)
+                    } label: {
+                        Image(systemName: "mic")
+                            .font(.system(size: 14))
+                            .foregroundColor(neutralGray500)
+                    }
+                    .buttonStyle(.plain)
+                    .nativeTooltip(companionManager.isSparkleCursorEnabled ? "Sparkle: \(sparkleStatusShortLabel)" : "Toggle Sparkle")
+                    .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
 
-                if let photo = profilePhotoImage {
-                    Image(nsImage: photo)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(width: 32, height: 32)
-                        .clipShape(Circle())
-                } else {
-                    Circle()
-                        .fill(themePrimary)
-                        .frame(width: 32, height: 32)
-                        .overlay(
-                            Text(userInitialLetterForToolbar)
-                                .font(.system(size: 13, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                        )
+                    Image(systemName: "doc.text")
+                        .font(.system(size: 14))
+                        .foregroundColor(neutralGray500)
+                    Image(systemName: "link")
+                        .font(.system(size: 14))
+                        .foregroundColor(neutralGray500)
                 }
             }
         }
         .padding(.horizontal, 32)
-        .frame(height: 52)
-        .background(themeSurface.opacity(0.8))
-        .background(.ultraThinMaterial)
+        .frame(height: 48)
+        .background(Color.clear)
     }
 
     // MARK: - Welcome Header
 
     private var welcomeHeader: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        VStack(alignment: .leading, spacing: 8) {
             Text("Welcome back, \(userDisplayName)")
-                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .font(.system(size: 48, weight: .bold))
                 .foregroundColor(themeOnSurface)
-                .tracking(-0.5)
-            Text("Your next AI win is queued up. Keep the momentum and make today count.")
-                .font(.system(size: 16))
-                .foregroundColor(themeOnSurfaceVariant.opacity(0.7))
+                .tracking(-1.5)
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
+            Text("Ready to master a new LLM today?")
+                .font(.system(size: 17, weight: .medium))
+                .foregroundColor(themeOnSurfaceVariant)
         }
-        .padding(.top, 32)
+        .padding(.top, 40)
     }
 
     // MARK: - Bento Stats Grid
 
     private var bentoStatsGrid: some View {
         HStack(alignment: .top, spacing: 24) {
-            // Left card — trajectory
             trajectoryCard
-            // Right card — streak
+                .frame(maxWidth: .infinity)
             streakCard
-                .frame(minWidth: 200, maxWidth: 260)
+                .frame(minWidth: 220, maxWidth: 300)
         }
-        .frame(minHeight: 240)
+        .frame(minHeight: 260)
     }
 
     private var trajectoryCard: some View {
-        ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 32, style: .continuous)
-            .fill(
-                LinearGradient(
-                    colors: [themeOnSurface, Color(hex: "#3d4a47")],
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-            )
-            .shadow(color: themeOnSurface.opacity(0.12), radius: 24, y: 12)
+        VStack(alignment: .leading, spacing: 0) {
+            Text("KNOWLEDGE GRAPH")
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(themePrimary)
+                .tracking(1.2)
+                .padding(.bottom, 16)
 
-            // Abstract glow circle (decorative background element)
-        Circle()
-            .fill(Color.white.opacity(0.04))
-            .frame(width: 260, height: 260)
-            .blur(radius: 60)
-            .offset(x: 180, y: -60)
-
-            VStack(alignment: .leading, spacing: 0) {
-                Text("STATS")
-                    .font(.system(size: 11, weight: .medium, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.7))
-                    .tracking(2)
-                    .padding(.bottom, 8)
-
-                HStack(alignment: .firstTextBaseline, spacing: 12) {
-                    Text("\(aiToolsLearnedCount)")
-                        .font(.system(size: 52, weight: .heavy, design: .rounded))
-                        .foregroundColor(.white)
-                        .tracking(-2)
-                    Text("AI tools learned")
-                        .font(.system(size: 18, weight: .light, design: .rounded))
-                        .foregroundColor(.white.opacity(0.8))
-                }
-
-                Spacer()
-
-                HStack(spacing: 32) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("SESSIONS")
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5))
-                        HStack(alignment: .firstTextBaseline, spacing: 4) {
-                            Text("\(totalSessionsCount)")
-                                .font(.system(size: 22, weight: .bold, design: .rounded))
-                                .foregroundColor(.white)
-                            Text("total")
-                                .font(.system(size: 13))
-                                .foregroundColor(.white.opacity(0.6))
-                        }
-                    }
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.2))
-                        .frame(width: 1, height: 40)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("TOTAL HOURS")
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5))
-                        Text(totalHoursStudyingLabel)
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    }
-
-                    Rectangle()
-                        .fill(Color.white.opacity(0.2))
-                        .frame(width: 1, height: 40)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("MODEL")
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(.white.opacity(0.5))
-                        Text(companionManager.selectedModel == "claude-opus-4-6" ? "Opus 4.6" : "Sonnet 4.6")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .foregroundColor(.white)
-                    }
-                }
+            HStack(alignment: .firstTextBaseline, spacing: 12) {
+                Text("\(aiToolsLearnedCount)")
+                    .font(.system(size: 56, weight: .bold))
+                    .foregroundColor(themeOnSurface)
+                    .tracking(-2)
+                Text("AI tools learned")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundColor(themeOnSurfaceVariant)
             }
-            .padding(32)
-        }
-        .frame(maxWidth: .infinity, minHeight: 240)
-        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
-    }
 
-    private var streakCard: some View {
-        VStack(spacing: 0) {
             Spacer()
 
-            ZStack {
-                Circle()
-                    .stroke(themeSurfaceContainerHigh, lineWidth: 8)
-                    .frame(width: 116, height: 116)
+            Rectangle()
+                .fill(themeOutlineVariant.opacity(0.15))
+                .frame(height: 1)
+                .padding(.bottom, 24)
 
-                Circle()
-                    .trim(from: 0, to: streakProgress)
-                    .stroke(
-                        LinearGradient(
-                            colors: [themeTertiary, themeTertiaryContainer],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        style: StrokeStyle(lineWidth: 8, lineCap: .round)
-                    )
-                    .frame(width: 116, height: 116)
-                    .rotationEffect(.degrees(-90))
+            HStack(spacing: 32) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("SESSIONS")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(neutralGray400)
+                        .tracking(1.5)
+                    Text("\(totalSessionsCount)")
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(themeOnSurface)
+                }
 
-                VStack(spacing: 2) {
-                    Text("\(consecutiveDayStreak)")
-                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("DURATION")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(neutralGray400)
+                        .tracking(1.5)
+                    Text(totalHoursStudyingLabel)
+                        .font(.system(size: 22, weight: .bold))
+                        .foregroundColor(themeOnSurface)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("PRIMARY ENGINE")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(neutralGray400)
+                        .tracking(1.5)
+                    Text(companionManager.selectedModel == "claude-opus-4-6" ? "Opus 4.6" : "Sonnet 4.6")
+                        .font(.system(size: 22, weight: .bold))
                         .foregroundColor(themeTertiary)
-                    Text("DAYS")
-                        .font(.system(size: 9, weight: .medium, design: .monospaced))
-                        .foregroundColor(themeOnSurfaceVariant)
                 }
             }
-            .padding(.bottom, 12)
-
-            Text("Persistence Streak")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundColor(themeOnSurface)
-
-            Text("Keep the momentum going.")
-                .font(.system(size: 12))
-                .foregroundColor(themeOnSurfaceVariant)
-                .padding(.top, 2)
-
-            Spacer()
         }
-        .frame(maxWidth: .infinity, minHeight: 240)
+        .padding(32)
+        .frame(maxWidth: .infinity, minHeight: 260, alignment: .topLeading)
         .background(
             RoundedRectangle(cornerRadius: 32, style: .continuous)
                 .fill(themeSurfaceContainerLowest)
-                .shadow(color: Color.black.opacity(0.04), radius: 8, y: 4)
+                .shadow(color: themeOnSurface.opacity(0.04), radius: 32, y: 12)
         )
-        .overlay(
+    }
+
+    private var streakCard: some View {
+        ZStack {
             RoundedRectangle(cornerRadius: 32, style: .continuous)
-                .stroke(themeOutlineVariant.opacity(0.1), lineWidth: 1)
-        )
+                .fill(Color(hex: "#2e3034"))
+
+            // Abstract glow effects
+            Circle()
+                .fill(themePrimary)
+                .frame(width: 200, height: 200)
+                .blur(radius: 80)
+                .opacity(0.3)
+                .offset(x: 80, y: -100)
+
+            Circle()
+                .fill(Color(hex: "#60a5fa"))
+                .frame(width: 200, height: 200)
+                .blur(radius: 80)
+                .opacity(0.15)
+                .offset(x: -80, y: 100)
+
+            VStack(spacing: 0) {
+                Text("PERSISTENCE STREAK")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(Color(hex: "#adc6ff"))
+                    .tracking(1.2)
+                    .padding(.bottom, 24)
+
+                ZStack {
+                    Circle()
+                        .stroke(Color.white.opacity(0.1), lineWidth: 8)
+                        .frame(width: 140, height: 140)
+
+                    Circle()
+                        .trim(from: 0, to: streakProgress)
+                        .stroke(
+                            Color(hex: "#adc6ff"),
+                            style: StrokeStyle(lineWidth: 8, lineCap: .round)
+                        )
+                        .frame(width: 140, height: 140)
+                        .rotationEffect(.degrees(-90))
+
+                    VStack(spacing: 2) {
+                        Text("\(consecutiveDayStreak)")
+                            .font(.system(size: 42, weight: .bold))
+                            .foregroundColor(.white)
+                        Text("DAY")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(.white.opacity(0.6))
+                            .tracking(2)
+                    }
+                }
+                .padding(.bottom, 24)
+
+                Text("Keep going! You're just starting your elite learning journey.")
+                    .font(.system(size: 13))
+                    .foregroundColor(.white.opacity(0.8))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 16)
+            }
+            .padding(32)
+        }
+        .frame(maxWidth: .infinity, minHeight: 260)
+        .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+        .shadow(color: Color.black.opacity(0.15), radius: 20, y: 8)
     }
 
     // MARK: - Section Header
 
     private func sectionHeader(_ title: String, color: Color) -> some View {
-        HStack(spacing: 16) {
+        HStack {
             Text(title.uppercased())
-                .font(.system(size: 12, weight: .bold, design: .monospaced))
-                .foregroundColor(color)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(neutralGray400)
                 .tracking(2)
-            VStack { Divider().background(themeOutlineVariant.opacity(0.2)) }
+            Spacer()
+            Button { } label: {
+                HStack(spacing: 4) {
+                    Text("View All")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundColor(themePrimary)
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundColor(themePrimary)
+                }
+            }
+            .buttonStyle(.plain)
+            .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
         }
     }
 
@@ -908,16 +904,13 @@ struct MainWindowView: View {
             // Top row: icon + time/edit controls
             HStack {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.white)
+                    .fill(conversationColor.opacity(0.08))
                     .frame(width: 48, height: 48)
-                    .shadow(color: Color.black.opacity(0.05), radius: 4, y: 2)
                     .overlay(
                         Image(systemName: conversationIcon)
-                            .font(.system(size: 18))
+                            .font(.system(size: 20))
                             .foregroundColor(conversationColor)
                     )
-                    .scaleEffect(isHovered && !isEditing ? 1.1 : 1.0)
-                    .animation(.easeOut(duration: 0.2), value: isHovered)
 
                 Spacer()
 
@@ -947,32 +940,31 @@ struct MainWindowView: View {
                         }
 
                         Text(timeLabel(for: conversation.updatedAt))
-                            .font(.system(size: 10, weight: .medium, design: .monospaced))
-                            .foregroundColor(themeOnSurface.opacity(0.4))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                                    .fill(themeOnSurface.opacity(0.05))
-                            )
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(neutralGray400)
                     }
                     .animation(.easeOut(duration: 0.15), value: isHovered)
                 }
             }
-            .padding(.bottom, isEditing ? 16 : 32)
+            .padding(.bottom, isEditing ? 12 : 16)
 
             // Title
             if isEditing {
                 TextField("Session title", text: $editingTitle, onCommit: { saveEditingCard() })
                     .textFieldStyle(.plain)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(themeOnSurface)
                     .padding(.bottom, 8)
             } else {
                 Text(conversation.displayTitle)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                    .font(.system(size: 17, weight: .semibold))
                     .foregroundColor(themeOnSurface)
-                    .lineLimit(2)
+                    .lineLimit(1)
+                    .padding(.bottom, 6)
+            }
+
+            if !isEditing {
+                Spacer(minLength: 20)
             }
 
             // Tool type picker (edit mode only)
@@ -1009,36 +1001,43 @@ struct MainWindowView: View {
             }
 
             if !isEditing {
-                Spacer(minLength: 24)
+                Spacer(minLength: 4)
 
-                HStack(spacing: 8) {
-                    GeometryReader { geometry in
-                        ZStack(alignment: .leading) {
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(themeSurfaceContainerHigh)
-                            RoundedRectangle(cornerRadius: 4)
-                                .fill(conversationColor)
-                                .frame(width: geometry.size.width * progress)
-                        }
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(themeSurfaceContainerLow)
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(conversationColor)
+                            .frame(width: geometry.size.width * progress)
                     }
-                    .frame(height: 6)
+                }
+                .frame(height: 6)
+                .padding(.bottom, 6)
 
+                HStack {
+                    Text("PROGRESS")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(neutralGray400)
+                        .tracking(1.5)
+                    Spacer()
                     Text("\(progressPercent)%")
-                        .font(.system(size: 10, weight: .medium, design: .monospaced))
-                        .foregroundColor(themeOnSurfaceVariant)
-                        .frame(width: 32, alignment: .trailing)
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(conversationColor)
+                        .tracking(1.5)
                 }
             }
         }
         .padding(24)
         .background(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(isEditing ? themeSurfaceContainerLowest : (isHovered ? themeSurfaceContainerLowest : themeSurfaceContainerLow))
+                .fill(themeSurfaceContainerLowest)
+                .shadow(color: Color.black.opacity(0.03), radius: 20, y: 4)
         )
         .overlay(
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .stroke(
-                    isEditing ? themePrimary.opacity(0.4) : (isHovered ? themeOutlineVariant.opacity(0.3) : Color.clear),
+                    isEditing ? themePrimary.opacity(0.4) : (isHovered ? themeOutlineVariant.opacity(0.3) : themeOutlineVariant.opacity(0.1)),
                     lineWidth: isEditing ? 1.5 : 1
                 )
         )
@@ -1054,6 +1053,8 @@ struct MainWindowView: View {
                 if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
         }
+        .shadow(color: Color.black.opacity(isHovered ? 0.08 : 0), radius: 16, y: 4)
+        .animation(.easeOut(duration: 0.3), value: isHovered)
         .contextMenu {
             Button("Edit") { enterEditMode(for: conversation) }
             Divider()
@@ -1228,8 +1229,17 @@ struct MainWindowView: View {
 
     // MARK: - Focus Dock
 
+    @State private var isDockHovered = false
+
     private var focusDock: some View {
-        HStack(spacing: 0) {
+        HStack(spacing: 16) {
+            // Left icons
+            HStack(spacing: 12) {
+                dockIconButton("mic")
+                dockIconButton("doc.text")
+            }
+
+            // Main CTA
             Button {
                 conversationStore.endCurrentConversation()
                 let newConversationId = conversationStore.startNewConversation()
@@ -1238,62 +1248,59 @@ struct MainWindowView: View {
                     companionManager.setSparkleCursorEnabled(true)
                 }
             } label: {
-                HStack(spacing: 8) {
-                    ZStack {
-                        Circle()
-                            .fill(themePrimary)
-                            .frame(width: 40, height: 40)
-                            .shadow(color: themePrimary.opacity(0.3), radius: 8, y: 2)
-                        Image(systemName: "plus")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.white)
-                    }
-                    Text("New Session")
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundColor(themePrimary)
+                HStack(spacing: 6) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 14, weight: .semibold))
+                    Text("NEW SESSION")
+                        .font(.system(size: 9, weight: .bold))
+                        .tracking(2)
                 }
+                .foregroundColor(.white)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 10)
+                .background(
+                    Capsule()
+                        .fill(themePrimary)
+                        .shadow(color: themePrimary.opacity(0.2), radius: 8, y: 2)
+                )
             }
             .buttonStyle(.plain)
             .onHover { hovering in
                 if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
-            .padding(.trailing, 16)
 
-            Rectangle()
-                .fill(themeOutlineVariant.opacity(0.3))
-                .frame(width: 1, height: 24)
-                .padding(.horizontal, 8)
-
-            HStack(spacing: 4) {
-                dockIconButton("mic")
-                dockIconButton("doc.text")
+            // Right icons
+            HStack(spacing: 12) {
                 dockIconButton("link")
+                dockIconButton("ellipsis")
             }
-            .padding(.leading, 8)
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 12)
         .background(
             Capsule()
-                .fill(.ultraThinMaterial)
-                .shadow(color: Color.black.opacity(0.12), radius: 24, y: 8)
+                .fill(Color.white.opacity(0.8))
+                .background(
+                    Capsule()
+                        .fill(.ultraThinMaterial)
+                )
+                .shadow(color: Color(hex: "#0f172a").opacity(0.1), radius: 24, y: 8)
         )
         .overlay(
             Capsule()
-                .stroke(Color.white.opacity(0.2), lineWidth: 1)
+                .stroke(Color(hex: "#e2e8f0").opacity(0.2), lineWidth: 1)
         )
+        .scaleEffect(isDockHovered ? 1.03 : 1.0)
+        .animation(.easeOut(duration: 0.3), value: isDockHovered)
+        .onHover { hovering in isDockHovered = hovering }
     }
 
     private func dockIconButton(_ iconName: String) -> some View {
         Button { } label: {
             Image(systemName: iconName)
-                .font(.system(size: 14))
-                .foregroundColor(themeOnSurfaceVariant)
-                .frame(width: 36, height: 36)
-                .background(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(Color.clear)
-                )
+                .font(.system(size: 16))
+                .foregroundColor(neutralGray600)
+                .frame(width: 32, height: 32)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -1507,11 +1514,11 @@ struct MainWindowView: View {
 
     private func gradientForConversation(_ conversation: Conversation) -> [Color] {
         let gradients: [[Color]] = [
-            [Color(hex: "#2d3432"), Color(hex: "#4a5552")],
-            [Color(hex: "#3d3c3c"), Color(hex: "#5f5e5e")],
-            [Color(hex: "#3a3530"), Color(hex: "#5a554f")],
-            [Color(hex: "#2f3530"), Color(hex: "#4d5349")],
-            [Color(hex: "#383838"), Color(hex: "#585858")],
+            [Color(hex: "#1e3a5f"), Color(hex: "#2563eb")],
+            [Color(hex: "#1e40af"), Color(hex: "#3b82f6")],
+            [Color(hex: "#0c4a6e"), Color(hex: "#0ea5e9")],
+            [Color(hex: "#164e63"), Color(hex: "#06b6d4")],
+            [Color(hex: "#1a1c2e"), Color(hex: "#334155")],
         ]
         let index = abs(conversation.id.hashValue) % gradients.count
         return gradients[index]
