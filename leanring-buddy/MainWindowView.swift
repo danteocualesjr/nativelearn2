@@ -2158,6 +2158,27 @@ struct ConversationDetailView: View {
                 }
                 .pickerStyle(.segmented)
                 .frame(width: 180)
+
+                Button(action: { copyFullTranscriptToClipboard() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 11))
+                        Text("Copy")
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(themeOnSurfaceVariant)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .fill(themeSurfaceContainerLowest)
+                    )
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
+                .help("Copy full transcript to clipboard")
             }
             .frame(height: 52)
             .padding(.horizontal, 28)
@@ -2221,6 +2242,7 @@ struct ConversationDetailView: View {
                     .font(.system(size: 15))
                     .foregroundColor(themeOnSurface)
                     .lineSpacing(4)
+                    .textSelection(.enabled)
                     .padding(.horizontal, 28)
             } else {
                 ForEach(conversation.exchanges) { exchange in
@@ -2228,10 +2250,12 @@ struct ConversationDetailView: View {
                         Text("# \(exchange.userTranscript)")
                             .font(.system(size: 14, weight: .semibold))
                             .foregroundColor(themeOnSurface)
+                            .textSelection(.enabled)
                         Text(exchange.assistantResponse)
                             .font(.system(size: 14))
                             .foregroundColor(themeOnSurface.opacity(0.85))
                             .lineSpacing(3)
+                            .textSelection(.enabled)
                     }
                     .padding(.horizontal, 28)
                 }
@@ -2270,6 +2294,7 @@ struct ConversationDetailView: View {
                                 .font(.system(size: 14))
                                 .foregroundColor(themeOnSurface)
                                 .lineSpacing(3)
+                                .textSelection(.enabled)
                         }
                     }
 
@@ -2288,6 +2313,7 @@ struct ConversationDetailView: View {
                                 .font(.system(size: 14))
                                 .foregroundColor(themeOnSurface)
                                 .lineSpacing(3)
+                                .textSelection(.enabled)
                         }
                     }
                 }
@@ -2298,6 +2324,16 @@ struct ConversationDetailView: View {
             }
         }
         .padding(.horizontal, 28)
+    }
+
+    private func copyFullTranscriptToClipboard() {
+        let transcriptText = conversation.exchanges.map { exchange in
+            "You:\n\(exchange.userTranscript)\n\nSparkle:\n\(exchange.assistantResponse)"
+        }.joined(separator: "\n\n---\n\n")
+
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        pasteboard.setString(transcriptText, forType: .string)
     }
 
     private var dateLabel: String {
