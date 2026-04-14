@@ -116,6 +116,13 @@ struct NavigationBubbleSizePreferenceKey: PreferenceKey {
     }
 }
 
+struct ErrorBubbleSizePreferenceKey: PreferenceKey {
+    static var defaultValue: CGSize = .zero
+    static func reduce(value: inout CGSize, nextValue: () -> CGSize) {
+        value = nextValue()
+    }
+}
+
 /// The buddy's behavioral mode. Controls whether it follows the cursor,
 /// is flying toward a detected UI element, or is pointing at an element.
 enum BuddyNavigationMode {
@@ -175,6 +182,7 @@ struct BlueCursorView: View {
     @State private var navigationBubbleText: String = ""
     @State private var navigationBubbleOpacity: Double = 0.0
     @State private var navigationBubbleSize: CGSize = .zero
+    @State private var errorBubbleSize: CGSize = .zero
 
     /// The cursor position at the moment navigation started, used to detect
     /// if the user moves the cursor enough to cancel the navigation.
@@ -392,6 +400,39 @@ struct BlueCursorView: View {
                 .position(cursorPosition)
                 .animation(.spring(response: 0.2, dampingFraction: 0.6, blendDuration: 0), value: cursorPosition)
                 .animation(.easeIn(duration: 0.15), value: companionManager.voiceState)
+
+            // Error bubble — shown briefly when an API call fails so the user
+            // gets visual feedback even if audio is muted or system TTS is missed.
+            if let errorMessage = companionManager.overlayErrorMessage, isCursorOnThisScreen {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(Color(hex: "#fbbf24"))
+                    Text(errorMessage)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.white)
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(Color(hex: "#dc2626").opacity(0.9))
+                        .shadow(color: Color.black.opacity(0.3), radius: 6, x: 0, y: 2)
+                )
+                .fixedSize()
+                .overlay(
+                    GeometryReader { geometry in
+                        Color.clear
+                            .preference(key: ErrorBubbleSizePreferenceKey.self, value: geometry.size)
+                    }
+                )
+                .position(x: cursorPosition.x + 10 + (errorBubbleSize.width / 2), y: cursorPosition.y - 24)
+                .animation(.spring(response: 0.2, dampingFraction: 0.6, blendDuration: 0), value: cursorPosition)
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+                .onPreferenceChange(ErrorBubbleSizePreferenceKey.self) { newSize in
+                    errorBubbleSize = newSize
+                }
+            }
 
         }
         .frame(width: screenFrame.width, height: screenFrame.height)

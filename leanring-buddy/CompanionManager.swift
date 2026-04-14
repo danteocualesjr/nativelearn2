@@ -121,6 +121,11 @@ final class CompanionManager: ObservableObject {
     /// Used by the panel to show accurate status text ("Active" vs "Ready").
     @Published private(set) var isOverlayVisible: Bool = false
 
+    /// Short user-facing error message shown in the overlay and sidebar when
+    /// an API call (Claude, ElevenLabs) fails. Auto-clears after a few seconds.
+    @Published private(set) var overlayErrorMessage: String?
+    private var overlayErrorAutoClearTask: Task<Void, Never>?
+
     /// The Claude model used for voice responses. Persisted to UserDefaults.
     @Published var selectedModel: String = UserDefaults.standard.string(forKey: "selectedClaudeModel") ?? "claude-sonnet-4-6"
 
@@ -704,6 +709,7 @@ final class CompanionManager: ObservableObject {
                 print("⚠️ Companion response error: \(error)")
                 isMultiPointSequenceActive = false
                 speakCreditsErrorFallback()
+                showOverlayError("Couldn't reach Sparkle's brain — check your connection")
             }
 
             if !Task.isCancelled {
@@ -755,6 +761,7 @@ final class CompanionManager: ObservableObject {
                 VibecademyAnalytics.trackTTSError(error: error.localizedDescription)
                 print("⚠️ ElevenLabs TTS error: \(error)")
                 speakCreditsErrorFallback()
+                showOverlayError("Voice playback failed — using system voice")
             }
         }
     }
@@ -914,6 +921,19 @@ final class CompanionManager: ObservableObject {
         let synthesizer = NSSpeechSynthesizer()
         synthesizer.startSpeaking(utterance)
         voiceState = .responding
+    }
+
+    /// Shows a brief error message in the overlay and sidebar, then auto-clears
+    /// it after a delay so the UI doesn't stay in an error state permanently.
+    private func showOverlayError(_ message: String, autoClearAfterSeconds: Double = 6.0) {
+        overlayErrorAutoClearTask?.cancel()
+        overlayErrorMessage = message
+        overlayErrorAutoClearTask = Task {
+            try? await Task.sleep(nanoseconds: UInt64(autoClearAfterSeconds * 1_000_000_000))
+            if !Task.isCancelled {
+                overlayErrorMessage = nil
+            }
+        }
     }
 
     // MARK: - Point Tag Parsing

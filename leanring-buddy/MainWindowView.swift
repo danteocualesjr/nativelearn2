@@ -418,12 +418,14 @@ struct MainWindowView: View {
     }
 
     private var sparkleStatusColor: Color {
+        if companionManager.overlayErrorMessage != nil { return Color.red.opacity(0.8) }
         if !companionManager.allPermissionsGranted { return Color.orange.opacity(0.8) }
         if companionManager.isSparkleCursorEnabled { return Color.green.opacity(0.8) }
         return neutralGray400.opacity(0.5)
     }
 
     private var sparkleStatusShortLabel: String {
+        if companionManager.overlayErrorMessage != nil { return "Error" }
         if !companionManager.allPermissionsGranted { return "Setup" }
         if companionManager.isSparkleCursorEnabled {
             switch companionManager.voiceState {
