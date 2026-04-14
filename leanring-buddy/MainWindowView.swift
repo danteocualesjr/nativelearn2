@@ -571,10 +571,13 @@ struct MainWindowView: View {
                             .padding(.bottom, 48)
                         }
 
-                        // Empty state
+                        // Empty state — different messaging for "no conversations" vs "search returned nothing"
                         if filteredGroups.isEmpty {
-                            emptyStateView
-                                .padding(.top, 24)
+                            if searchText.isEmpty {
+                                noConversationsYetView
+                            } else {
+                                noSearchResultsView
+                            }
                         }
                     }
                     .padding(.bottom, 100)
@@ -1378,9 +1381,9 @@ struct MainWindowView: View {
             )
     }
 
-    // MARK: - Empty State
+    // MARK: - Empty States
 
-    private var emptyStateView: some View {
+    private var noConversationsYetView: some View {
         VStack(spacing: 16) {
             GlassSparkleView(baseColor: neutralGray400, size: 32, isMuted: true)
             Text("No conversations yet")
@@ -1391,6 +1394,35 @@ struct MainWindowView: View {
                 .foregroundColor(neutralGray400)
         }
         .frame(maxWidth: .infinity)
+        .padding(.top, 24)
+    }
+
+    private var noSearchResultsView: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 28, weight: .light))
+                .foregroundColor(neutralGray400)
+            Text("No results for \"\(searchText)\"")
+                .font(.system(size: 17, weight: .medium, design: .rounded))
+                .foregroundColor(neutralGray500)
+            Button {
+                searchText = ""
+            } label: {
+                Text("Clear search")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(themePrimary)
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                if hovering {
+                    NSCursor.pointingHand.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 24)
     }
 
     // MARK: - Computed Stats
