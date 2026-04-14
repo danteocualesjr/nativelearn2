@@ -127,7 +127,7 @@ struct MainWindowView: View {
                         .font(.system(size: 18, weight: .bold))
                         .foregroundColor(Color(hex: "#0f172a"))
                         .tracking(-0.3)
-                    Text("PREMIUM EDITION")
+                    Text("PRO PLUS")
                         .font(.system(size: 9, weight: .bold))
                         .foregroundColor(neutralGray400)
                         .tracking(1.6)
