@@ -73,6 +73,7 @@ struct MainWindowView: View {
     enum SidebarItem: Hashable {
         case home
         case chat
+        case archive
         case profile
         case space(UUID)
     }
@@ -177,6 +178,7 @@ struct MainWindowView: View {
             VStack(spacing: 2) {
                 sidebarNavRow(item: .home, icon: "house", label: "Home")
                 sidebarNavRow(item: .chat, icon: "bubble.left.and.bubble.right", label: "Chat")
+                sidebarArchiveRow
             }
             .padding(.horizontal, 8)
 
@@ -344,6 +346,45 @@ struct MainWindowView: View {
 
     // MARK: - Sidebar Helpers
 
+    private var archivedConversationCount: Int {
+        conversationStore.conversations.filter { $0.archived }.count
+    }
+
+    private var sidebarArchiveRow: some View {
+        let isSelected = sidebarSelection == .archive
+        let isHovered = hoveredSidebarItem == .archive
+        let iconName = isSelected ? "archivebox.fill" : "archivebox"
+
+        return HStack(spacing: 12) {
+            Image(systemName: iconName)
+                .font(.system(size: 14))
+                .foregroundColor(isSelected ? themePrimary : neutralGray500)
+            Text("Archive")
+                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
+                .foregroundColor(isSelected ? Color(hex: "#0f172a") : neutralGray500)
+            Spacer()
+            if archivedConversationCount > 0 {
+                Text("\(archivedConversationCount)")
+                    .font(.system(size: 11, weight: .medium, design: .rounded))
+                    .foregroundColor(neutralGray400)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isSelected ? sidebarHoverBg : (isHovered ? sidebarHoverBg.opacity(0.5) : Color.clear))
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            sidebarSelection = .archive
+            selectedConversationId = nil
+        }
+        .onHover { hovering in
+            hoveredSidebarItem = hovering ? .archive : nil
+        }
+    }
+
     private func sidebarNavRow(item: SidebarItem, icon: String, label: String) -> some View {
         let isSelected = sidebarSelection == item
         let isHovered = hoveredSidebarItem == item
@@ -463,6 +504,8 @@ struct MainWindowView: View {
                 companionManager: companionManager,
                 conversationStore: conversationStore
             )
+        } else if sidebarSelection == .archive {
+            archiveView
         } else {
             dashboardView
         }
@@ -474,7 +517,7 @@ struct MainWindowView: View {
         let spaceFilter: UUID? = {
             switch sidebarSelection {
             case .space(let id): return id
-            case .home, .chat, .profile: return nil
+            case .home, .chat, .archive, .profile: return nil
             }
         }()
 
@@ -1381,6 +1424,156 @@ struct MainWindowView: View {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .stroke(themeOutlineVariant.opacity(0.2), lineWidth: 1)
             )
+    }
+
+    // MARK: - Archive View
+
+    @State private var hoveredArchivedCardId: UUID?
+
+    private var archiveView: some View {
+        let archivedConversations = conversationStore.conversations
+            .filter { $0.archived }
+            .sorted { $0.updatedAt > $1.updatedAt }
+
+        return VStack(spacing: 0) {
+            // Header
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Archive")
+                        .font(.system(size: 28, weight: .bold, design: .rounded))
+                        .foregroundColor(themeOnSurface)
+                    Text("\(archivedConversations.count) archived conversation\(archivedConversations.count == 1 ? "" : "s")")
+                        .font(.system(size: 13))
+                        .foregroundColor(neutralGray500)
+                }
+                Spacer()
+            }
+            .padding(.horizontal, 32)
+            .padding(.top, 32)
+            .padding(.bottom, 24)
+
+            if archivedConversations.isEmpty {
+                Spacer()
+                VStack(spacing: 16) {
+                    Image(systemName: "archivebox")
+                        .font(.system(size: 28, weight: .light))
+                        .foregroundColor(neutralGray400)
+                    Text("No archived conversations")
+                        .font(.system(size: 17, weight: .medium, design: .rounded))
+                        .foregroundColor(neutralGray500)
+                    Text("Archived sessions will appear here")
+                        .font(.system(size: 13))
+                        .foregroundColor(neutralGray400)
+                }
+                .frame(maxWidth: .infinity)
+                Spacer()
+            } else {
+                ScrollView {
+                    LazyVStack(spacing: 0) {
+                        ForEach(archivedConversations) { conversation in
+                            archivedConversationRow(conversation)
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 32)
+                }
+            }
+        }
+        .background(themeSurface)
+    }
+
+    private func archivedConversationRow(_ conversation: Conversation) -> some View {
+        let isHovered = hoveredArchivedCardId == conversation.id
+
+        return HStack(spacing: 16) {
+            Image(systemName: iconForConversation(conversation))
+                .font(.system(size: 14))
+                .foregroundColor(colorForConversation(conversation).opacity(0.7))
+                .frame(width: 32, height: 32)
+                .background(
+                    RoundedRectangle(cornerRadius: 8, style: .continuous)
+                        .fill(colorForConversation(conversation).opacity(0.08))
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(conversation.displayTitle)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(themeOnSurface)
+                    .lineLimit(1)
+                HStack(spacing: 8) {
+                    Text(shortDateLabel(conversation.updatedAt))
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(neutralGray400)
+                    if !conversation.summary.isEmpty {
+                        Text(conversation.summary)
+                            .font(.system(size: 12))
+                            .foregroundColor(neutralGray500)
+                            .lineLimit(1)
+                    }
+                }
+            }
+
+            Spacer()
+
+            if isHovered {
+                HStack(spacing: 4) {
+                    Button {
+                        conversationStore.unarchiveConversation(conversation.id)
+                    } label: {
+                        Image(systemName: "arrow.uturn.backward")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(neutralGray500)
+                            .frame(width: 28, height: 28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(themeSurfaceContainerHigh)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .nativeTooltip("Unarchive")
+                    .onHover { hovering in
+                        if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                    }
+
+                    Button {
+                        conversationStore.deleteConversation(conversation.id)
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(Color.red.opacity(0.7))
+                            .frame(width: 28, height: 28)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .fill(Color.red.opacity(0.06))
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .nativeTooltip("Delete permanently")
+                    .onHover { hovering in
+                        if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                    }
+                }
+                .transition(.opacity)
+            }
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(isHovered ? themeSurfaceContainerLow : Color.clear)
+        )
+        .contentShape(Rectangle())
+        .onTapGesture {
+            selectedConversationId = conversation.id
+        }
+        .onHover { hovering in
+            hoveredArchivedCardId = hovering ? conversation.id : nil
+        }
+        .contextMenu {
+            Button("Unarchive") { conversationStore.unarchiveConversation(conversation.id) }
+            Button("Delete", role: .destructive) { conversationStore.deleteConversation(conversation.id) }
+        }
+        .animation(.easeOut(duration: 0.15), value: isHovered)
     }
 
     // MARK: - Empty States
