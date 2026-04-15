@@ -59,17 +59,22 @@ struct Conversation: Codable, Identifiable {
     var spaceId: UUID?
     var toolType: ConversationToolType?
     var isArchived: Bool?
+    /// When set, this conversation was started from an Academy lesson.
+    /// The context string is prepended to Sparkle's system prompt so
+    /// the tutor knows what the user is trying to learn.
+    var lessonContext: String?
     var exchanges: [ConversationExchange]
     let createdAt: Date
     var updatedAt: Date
 
-    init(title: String = "", summary: String = "", spaceId: UUID? = nil, toolType: ConversationToolType? = nil) {
+    init(title: String = "", summary: String = "", spaceId: UUID? = nil, toolType: ConversationToolType? = nil, lessonContext: String? = nil) {
         self.id = UUID()
         self.title = title
         self.summary = summary
         self.spaceId = spaceId
         self.toolType = toolType
         self.isArchived = false
+        self.lessonContext = lessonContext
         self.exchanges = []
         self.createdAt = Date()
         self.updatedAt = Date()
@@ -132,6 +137,14 @@ final class ConversationStore: ObservableObject {
 
     func startNewConversation() -> UUID {
         let conversation = Conversation()
+        conversations.insert(conversation, at: 0)
+        activeConversationId = conversation.id
+        save()
+        return conversation.id
+    }
+
+    func startNewConversationWithTitle(title: String, lessonContext: String? = nil) -> UUID {
+        let conversation = Conversation(title: title, lessonContext: lessonContext)
         conversations.insert(conversation, at: 0)
         activeConversationId = conversation.id
         save()

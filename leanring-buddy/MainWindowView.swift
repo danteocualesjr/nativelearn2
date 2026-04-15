@@ -547,82 +547,22 @@ struct MainWindowView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        // Welcome
                         welcomeHeader
                             .padding(.horizontal, 32)
                             .padding(.bottom, 12)
 
-                        // Hero (setup / activation)
-                        if !companionManager.allPermissionsGranted || !companionManager.isSparkleCursorEnabled {
-                            heroCard
-                                .padding(.horizontal, 32)
-                                .padding(.bottom, 24)
-                        }
-
-                        // Bento stats
-                        bentoStatsGrid
-                            .padding(.horizontal, 32)
-                            .padding(.bottom, 48)
-
-                        // Today
-                        if let todayConversations = todayGroup?.1, !todayConversations.isEmpty {
-                            sectionHeader("Today", color: themeSecondary)
-                                .padding(.horizontal, 32)
-                                .padding(.bottom, 24)
-
-                            LazyVGrid(
-                                columns: [GridItem(.flexible(), spacing: 24), GridItem(.flexible(), spacing: 24)],
-                                spacing: 24
-                            ) {
-                                ForEach(todayConversations) { conversation in
-                                    todayConversationCard(conversation)
-                                }
-                            }
-                            .padding(.horizontal, 32)
-                            .padding(.bottom, 48)
-                        }
-
-                        // Yesterday
-                        if let yesterdayConversations = yesterdayGroup?.1, !yesterdayConversations.isEmpty {
-                            sectionHeader("Yesterday", color: themeOnSurfaceVariant)
-                                .padding(.horizontal, 32)
-                                .padding(.bottom, 16)
-
-                            VStack(spacing: 4) {
-                                ForEach(yesterdayConversations) { conversation in
-                                    yesterdayConversationRow(conversation)
-                                }
-                            }
-                            .padding(.horizontal, 32)
-                            .padding(.bottom, 48)
-                        }
-
-                        // Previous
-                        if !previousGroups.isEmpty {
-                            let allPreviousConversations = previousGroups.flatMap { $0.1 }
-                            sectionHeader("Previous Sessions", color: themeOnSurfaceVariant.opacity(0.5))
-                                .padding(.horizontal, 32)
-                                .padding(.bottom, 24)
-
-                            LazyVGrid(
-                                columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 3),
-                                spacing: 24
-                            ) {
-                                ForEach(allPreviousConversations) { conversation in
-                                    previousSessionCard(conversation)
-                                }
-                            }
-                            .padding(.horizontal, 32)
-                            .padding(.bottom, 48)
-                        }
-
-                        // Empty state — different messaging for "no conversations" vs "search returned nothing"
-                        if filteredGroups.isEmpty {
-                            if searchText.isEmpty {
-                                noConversationsYetView
-                            } else {
-                                noSearchResultsView
-                            }
+                        switch selectedTopTab {
+                        case "Academy":
+                            academyTabContent
+                        case "Insights":
+                            insightsPlaceholder
+                        default:
+                            dashboardTabContent(
+                                todayGroup: todayGroup,
+                                yesterdayGroup: yesterdayGroup,
+                                previousGroups: previousGroups,
+                                filteredGroups: filteredGroups
+                            )
                         }
                     }
                     .padding(.bottom, 100)
@@ -630,9 +570,550 @@ struct MainWindowView: View {
             }
             .background(themeSurface)
 
-            // Floating focus dock
             focusDock
                 .padding(.bottom, 32)
+        }
+    }
+
+    // MARK: - Dashboard Tab Content (extracted from dashboardView)
+
+    @ViewBuilder
+    private func dashboardTabContent(
+        todayGroup: (String, [Conversation])?,
+        yesterdayGroup: (String, [Conversation])?,
+        previousGroups: [(String, [Conversation])],
+        filteredGroups: [(String, [Conversation])]
+    ) -> some View {
+        if !companionManager.allPermissionsGranted || !companionManager.isSparkleCursorEnabled {
+            heroCard
+                .padding(.horizontal, 32)
+                .padding(.bottom, 24)
+        }
+
+        bentoStatsGrid
+            .padding(.horizontal, 32)
+            .padding(.bottom, 48)
+
+        if let todayConversations = todayGroup?.1, !todayConversations.isEmpty {
+            sectionHeader("Today", color: themeSecondary)
+                .padding(.horizontal, 32)
+                .padding(.bottom, 24)
+
+            LazyVGrid(
+                columns: [GridItem(.flexible(), spacing: 24), GridItem(.flexible(), spacing: 24)],
+                spacing: 24
+            ) {
+                ForEach(todayConversations) { conversation in
+                    todayConversationCard(conversation)
+                }
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 48)
+        }
+
+        if let yesterdayConversations = yesterdayGroup?.1, !yesterdayConversations.isEmpty {
+            sectionHeader("Yesterday", color: themeOnSurfaceVariant)
+                .padding(.horizontal, 32)
+                .padding(.bottom, 16)
+
+            VStack(spacing: 4) {
+                ForEach(yesterdayConversations) { conversation in
+                    yesterdayConversationRow(conversation)
+                }
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 48)
+        }
+
+        if !previousGroups.isEmpty {
+            let allPreviousConversations = previousGroups.flatMap { $0.1 }
+            sectionHeader("Previous Sessions", color: themeOnSurfaceVariant.opacity(0.5))
+                .padding(.horizontal, 32)
+                .padding(.bottom, 24)
+
+            LazyVGrid(
+                columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 3),
+                spacing: 24
+            ) {
+                ForEach(allPreviousConversations) { conversation in
+                    previousSessionCard(conversation)
+                }
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 48)
+        }
+
+        if filteredGroups.isEmpty {
+            if searchText.isEmpty {
+                noConversationsYetView
+            } else {
+                noSearchResultsView
+            }
+        }
+    }
+
+    // MARK: - Insights Placeholder
+
+    private var insightsPlaceholder: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "chart.bar.xaxis")
+                .font(.system(size: 48))
+                .foregroundColor(neutralGray400)
+            Text("Insights coming soon")
+                .font(.system(size: 17, weight: .semibold))
+                .foregroundColor(themeOnSurfaceVariant)
+            Text("Track your learning patterns, strengths, and areas for growth.")
+                .font(.system(size: 13))
+                .foregroundColor(neutralGray400)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.top, 80)
+        .padding(.horizontal, 32)
+    }
+
+    // MARK: - Academy Tab
+
+    @State private var selectedAcademyCategoryFilter: AcademyCategory?
+    @State private var selectedAcademyTool: AcademyTool?
+    @State private var hoveredAcademyToolId: String?
+    @State private var hoveredAcademyLessonId: String?
+
+    @ViewBuilder
+    private var academyTabContent: some View {
+        if let selectedTool = selectedAcademyTool {
+            academyToolDetailView(for: selectedTool)
+        } else {
+            academyCatalogView
+        }
+    }
+
+    // MARK: Academy Catalog
+
+    private var academyCatalogView: some View {
+        let filteredTools: [AcademyTool] = {
+            guard let category = selectedAcademyCategoryFilter else {
+                return AcademyCatalog.tools
+            }
+            return AcademyCatalog.tools.filter { $0.category == category }
+        }()
+
+        return VStack(alignment: .leading, spacing: 0) {
+            // Category filter pills
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    academyCategoryPill(label: "All", isSelected: selectedAcademyCategoryFilter == nil) {
+                        selectedAcademyCategoryFilter = nil
+                    }
+                    ForEach(AcademyCategory.allCases) { category in
+                        academyCategoryPill(
+                            label: category.rawValue,
+                            iconName: category.iconName,
+                            isSelected: selectedAcademyCategoryFilter == category
+                        ) {
+                            selectedAcademyCategoryFilter = category
+                        }
+                    }
+                }
+                .padding(.horizontal, 32)
+            }
+            .padding(.bottom, 32)
+
+            // Tool card grid
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 20),
+                    GridItem(.flexible(), spacing: 20),
+                    GridItem(.flexible(), spacing: 20),
+                ],
+                spacing: 20
+            ) {
+                ForEach(filteredTools) { tool in
+                    academyToolCard(tool)
+                }
+            }
+            .padding(.horizontal, 32)
+        }
+    }
+
+    private func academyCategoryPill(
+        label: String,
+        iconName: String? = nil,
+        isSelected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                if let iconName = iconName {
+                    Image(systemName: iconName)
+                        .font(.system(size: 11, weight: .medium))
+                }
+                Text(label)
+                    .font(.system(size: 12, weight: .semibold))
+            }
+            .foregroundColor(isSelected ? .white : themeOnSurfaceVariant)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 7)
+            .background(
+                Capsule()
+                    .fill(isSelected ? themePrimary : themeSurfaceContainerLowest)
+            )
+            .overlay(
+                Capsule()
+                    .stroke(isSelected ? Color.clear : themeOutlineVariant.opacity(0.4), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
+
+    private func academyToolCard(_ tool: AcademyTool) -> some View {
+        let isHovered = hoveredAcademyToolId == tool.id
+        let completedLessonCount = completedLessonsCount(for: tool)
+        let totalLessonCount = tool.lessons.count
+
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                selectedAcademyTool = tool
+            }
+        } label: {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .top) {
+                    Image(systemName: tool.iconName)
+                        .font(.system(size: 22))
+                        .foregroundColor(themePrimary)
+                        .frame(width: 44, height: 44)
+                        .background(
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(themePrimary.opacity(0.08))
+                        )
+
+                    Spacer()
+
+                    Text(tool.difficulty.rawValue)
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(Color(hex: tool.difficulty.colorHex))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule()
+                                .fill(Color(hex: tool.difficulty.colorHex).opacity(0.1))
+                        )
+                }
+                .padding(.bottom, 14)
+
+                Text(tool.name)
+                    .font(.system(size: 16, weight: .bold))
+                    .foregroundColor(themeOnSurface)
+                    .padding(.bottom, 4)
+
+                Text(tool.description)
+                    .font(.system(size: 12))
+                    .foregroundColor(themeOnSurfaceVariant)
+                    .lineSpacing(2)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Spacer()
+
+                // Progress
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text("\(completedLessonCount)/\(totalLessonCount) lessons")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(neutralGray400)
+                        Spacer()
+                        if completedLessonCount == totalLessonCount && totalLessonCount > 0 {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 12))
+                                .foregroundColor(Color(hex: "#059669"))
+                        }
+                    }
+
+                    GeometryReader { geometry in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(themeOutlineVariant.opacity(0.2))
+                                .frame(height: 4)
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(themePrimary)
+                                .frame(
+                                    width: totalLessonCount > 0
+                                        ? geometry.size.width * CGFloat(completedLessonCount) / CGFloat(totalLessonCount)
+                                        : 0,
+                                    height: 4
+                                )
+                        }
+                    }
+                    .frame(height: 4)
+                }
+            }
+            .padding(20)
+            .frame(maxWidth: .infinity, minHeight: 200, alignment: .topLeading)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(themeSurfaceContainerLowest)
+                    .shadow(
+                        color: themeOnSurface.opacity(isHovered ? 0.08 : 0.04),
+                        radius: isHovered ? 16 : 8,
+                        y: isHovered ? 6 : 3
+                    )
+            )
+            .scaleEffect(isHovered ? 1.02 : 1.0)
+            .animation(.easeOut(duration: 0.2), value: isHovered)
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            hoveredAcademyToolId = hovering ? tool.id : nil
+            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
+
+    // MARK: Academy Tool Detail
+
+    private func academyToolDetailView(for tool: AcademyTool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Back button
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    selectedAcademyTool = nil
+                }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.left")
+                        .font(.system(size: 12, weight: .semibold))
+                    Text("All Tools")
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundColor(themePrimary)
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 24)
+
+            // Tool header
+            HStack(alignment: .top, spacing: 16) {
+                Image(systemName: tool.iconName)
+                    .font(.system(size: 28))
+                    .foregroundColor(themePrimary)
+                    .frame(width: 56, height: 56)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(themePrimary.opacity(0.08))
+                    )
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 10) {
+                        Text(tool.name)
+                            .font(.system(size: 24, weight: .bold))
+                            .foregroundColor(themeOnSurface)
+
+                        Text(tool.difficulty.rawValue)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(Color(hex: tool.difficulty.colorHex))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(Color(hex: tool.difficulty.colorHex).opacity(0.1))
+                            )
+
+                        Text(tool.category.rawValue)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(neutralGray500)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(
+                                Capsule()
+                                    .fill(neutralGray400.opacity(0.12))
+                            )
+                    }
+
+                    Text(tool.description)
+                        .font(.system(size: 14))
+                        .foregroundColor(themeOnSurfaceVariant)
+                        .lineSpacing(2)
+                }
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 32)
+
+            // Lessons header
+            HStack {
+                Text("LESSONS")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(neutralGray400)
+                    .tracking(1.5)
+
+                Spacer()
+
+                let completedCount = completedLessonsCount(for: tool)
+                Text("\(completedCount)/\(tool.lessons.count) completed")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(neutralGray400)
+            }
+            .padding(.horizontal, 32)
+            .padding(.bottom, 16)
+
+            // Lesson cards
+            VStack(spacing: 12) {
+                ForEach(Array(tool.lessons.enumerated()), id: \.element.id) { lessonIndex, lesson in
+                    let isLessonCompleted = isLessonCompleted(lesson, forTool: tool)
+                    let isHovered = hoveredAcademyLessonId == lesson.id
+
+                    HStack(spacing: 16) {
+                        // Lesson number
+                        ZStack {
+                            Circle()
+                                .fill(isLessonCompleted ? Color(hex: "#059669") : themePrimary.opacity(0.08))
+                                .frame(width: 36, height: 36)
+                            if isLessonCompleted {
+                                Image(systemName: "checkmark")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white)
+                            } else {
+                                Text("\(lessonIndex + 1)")
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(themePrimary)
+                            }
+                        }
+
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(lesson.title)
+                                .font(.system(size: 14, weight: .semibold))
+                                .foregroundColor(themeOnSurface)
+                            Text(lesson.description)
+                                .font(.system(size: 12))
+                                .foregroundColor(themeOnSurfaceVariant)
+                                .lineLimit(2)
+                        }
+
+                        Spacer()
+
+                        HStack(spacing: 12) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock")
+                                    .font(.system(size: 10))
+                                Text("\(lesson.estimatedMinutes) min")
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            .foregroundColor(neutralGray400)
+
+                            Button {
+                                startLesson(lesson, forTool: tool)
+                            } label: {
+                                Text(isLessonCompleted ? "Redo" : "Start")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 7)
+                                    .background(Capsule().fill(themePrimary))
+                            }
+                            .buttonStyle(.plain)
+                            .onHover { hovering in
+                                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                            }
+                        }
+                    }
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(themeSurfaceContainerLowest)
+                            .shadow(
+                                color: themeOnSurface.opacity(isHovered ? 0.06 : 0.03),
+                                radius: isHovered ? 12 : 4,
+                                y: isHovered ? 4 : 2
+                            )
+                    )
+                    .onHover { hovering in
+                        hoveredAcademyLessonId = hovering ? lesson.id : nil
+                    }
+                }
+            }
+            .padding(.horizontal, 32)
+
+            // Learning objectives
+            if let selectedTool = selectedAcademyTool {
+                let allObjectives = selectedTool.lessons.flatMap { $0.learningObjectives }
+                if !allObjectives.isEmpty {
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("WHAT YOU'LL LEARN")
+                            .font(.system(size: 11, weight: .bold))
+                            .foregroundColor(neutralGray400)
+                            .tracking(1.5)
+
+                        LazyVGrid(
+                            columns: [GridItem(.flexible(), spacing: 16), GridItem(.flexible(), spacing: 16)],
+                            alignment: .leading,
+                            spacing: 10
+                        ) {
+                            ForEach(allObjectives.prefix(8), id: \.self) { objective in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Image(systemName: "checkmark.circle")
+                                        .font(.system(size: 12))
+                                        .foregroundColor(themePrimary)
+                                        .padding(.top, 1)
+                                    Text(objective)
+                                        .font(.system(size: 12))
+                                        .foregroundColor(themeOnSurfaceVariant)
+                                        .lineSpacing(2)
+                                }
+                            }
+                        }
+                    }
+                    .padding(24)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20, style: .continuous)
+                            .fill(themePrimary.opacity(0.03))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                                    .stroke(themePrimary.opacity(0.08), lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal, 32)
+                    .padding(.top, 32)
+                }
+            }
+        }
+    }
+
+    // MARK: - Start Lesson
+
+    private func startLesson(_ lesson: AcademyLesson, forTool tool: AcademyTool) {
+        conversationStore.endCurrentConversation()
+        let lessonConversationTitle = "\(tool.name): \(lesson.title)"
+        let newConversationId = conversationStore.startNewConversationWithTitle(
+            title: lessonConversationTitle,
+            lessonContext: lesson.systemPromptContext
+        )
+        selectedConversationId = newConversationId
+        if !companionManager.isSparkleCursorEnabled {
+            companionManager.setSparkleCursorEnabled(true)
+        }
+    }
+
+    // MARK: - Academy Progress
+
+    private func completedLessonsCount(for tool: AcademyTool) -> Int {
+        tool.lessons.filter { isLessonCompleted($0, forTool: tool) }.count
+    }
+
+    private func isLessonCompleted(_ lesson: AcademyLesson, forTool tool: AcademyTool) -> Bool {
+        let toolNameLowercased = tool.name.lowercased()
+        let lessonTitleLowercased = lesson.title.lowercased()
+
+        return conversationStore.conversations.contains { conversation in
+            let titleLowercased = conversation.displayTitle.lowercased()
+            let mentionsToolAndLesson = titleLowercased.contains(toolNameLowercased)
+                && titleLowercased.contains(lessonTitleLowercased)
+            let hasEnoughExchanges = conversation.exchanges.count >= 3
+            return mentionsToolAndLesson && hasEnoughExchanges
         }
     }
 

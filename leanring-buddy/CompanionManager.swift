@@ -652,9 +652,17 @@ final class CompanionManager: ObservableObject {
                     (userPlaceholder: entry.userTranscript, assistantResponse: entry.assistantResponse)
                 }
 
+                let activeLessonContext = conversationStore?.activeConversation?.lessonContext
+                let effectiveSystemPrompt: String = {
+                    guard let lessonContext = activeLessonContext, !lessonContext.isEmpty else {
+                        return Self.companionVoiceResponseSystemPrompt
+                    }
+                    return Self.companionVoiceResponseSystemPrompt + "\n\ncurrent guided lesson context:\n" + lessonContext
+                }()
+
                 let (fullResponseText, _) = try await claudeAPI.analyzeImageStreaming(
                     images: labeledImages,
-                    systemPrompt: Self.companionVoiceResponseSystemPrompt,
+                    systemPrompt: effectiveSystemPrompt,
                     conversationHistory: historyForAPI,
                     userPrompt: transcript,
                     onTextChunk: { _ in }
