@@ -14,6 +14,7 @@ import Foundation
 // MARK: - Tool Type
 
 enum ConversationToolType: String, Codable, CaseIterable {
+    
     case mobileApp = "mobile_app"
     case webApp = "web_app"
     case internalTool = "internal_tool"
