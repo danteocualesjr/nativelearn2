@@ -626,20 +626,20 @@ struct MainWindowView: View {
         }
 
         if !previousGroups.isEmpty {
-            let allPreviousConversations = previousGroups.flatMap { $0.1 }
-            sectionHeader("Previous Sessions", color: themeOnSurfaceVariant.opacity(0.5))
-                .padding(.horizontal, 32)
-                .padding(.bottom, 24)
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(Array(previousGroups.enumerated()), id: \.offset) { index, group in
+                    previousDateHeader(group.0)
+                        .padding(.top, index == 0 ? 0 : 20)
+                        .padding(.bottom, 8)
 
-            LazyVGrid(
-                columns: Array(repeating: GridItem(.flexible(), spacing: 24), count: 3),
-                spacing: 24
-            ) {
-                ForEach(allPreviousConversations) { conversation in
-                    previousSessionCard(conversation)
+                    VStack(spacing: 0) {
+                        ForEach(group.1) { conversation in
+                            previousSessionRow(conversation)
+                        }
+                    }
                 }
             }
-            .padding(.horizontal, 32)
+            .padding(.horizontal, 20)
             .padding(.bottom, 48)
         }
 
@@ -1681,64 +1681,79 @@ struct MainWindowView: View {
         }
     }
 
-    // MARK: - Previous Session Card
+    // MARK: - Previous Session Row (Granola-style list)
 
-    @State private var hoveredPreviousCardId: UUID?
+    @State private var hoveredPreviousRowId: UUID?
 
-    private func previousSessionCard(_ conversation: Conversation) -> some View {
-        let isHovered = hoveredPreviousCardId == conversation.id
-        let gradientColors = gradientForConversation(conversation)
+    private func previousDateHeader(_ label: String) -> some View {
+        Text(label)
+            .font(.system(size: 12, weight: .regular))
+            .foregroundColor(themeOnSurfaceVariant.opacity(0.7))
+            .padding(.horizontal, 12)
+    }
 
-        return ZStack(alignment: .bottomLeading) {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: gradientColors,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
+    private func previousSessionRow(_ conversation: Conversation) -> some View {
+        let isHovered = hoveredPreviousRowId == conversation.id
+        let trimmedName = userDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let ownerLabel = trimmedName.isEmpty ? "Me" : trimmedName
+
+        return HStack(spacing: 12) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 14, weight: .regular))
+                .foregroundColor(themeOnSurfaceVariant.opacity(0.75))
+                .frame(width: 28, height: 28)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .stroke(themeOutlineVariant.opacity(0.35), lineWidth: 1)
                 )
 
-            LinearGradient(
-                colors: [Color.black.opacity(0.6), Color.clear],
-                startPoint: .bottom,
-                endPoint: .top
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-
-            VStack(alignment: .leading, spacing: 4) {
-                Text(shortDateLabel(conversation.createdAt))
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.6))
+            VStack(alignment: .leading, spacing: 1) {
                 Text(conversation.displayTitle)
-                    .font(.system(size: 15, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
-                    .lineLimit(2)
+                    .font(.system(size: 13.5, weight: .semibold))
+                    .foregroundColor(themeOnSurface)
+                    .lineLimit(1)
+                Text(ownerLabel)
+                    .font(.system(size: 11))
+                    .foregroundColor(themeOnSurfaceVariant.opacity(0.65))
+                    .lineLimit(1)
             }
-            .padding(24)
+
+            Spacer(minLength: 12)
 
             if isHovered {
                 HStack(spacing: 4) {
-                    sessionHoverButton(icon: "archivebox", tooltip: "Archive", lightStyle: true) {
+                    sessionHoverButton(icon: "archivebox", tooltip: "Archive") {
                         conversationStore.archiveConversation(conversation.id)
                     }
-                    sessionHoverButton(icon: "trash", tooltip: "Delete", isDestructive: true, lightStyle: true) {
+                    sessionHoverButton(icon: "trash", tooltip: "Delete", isDestructive: true) {
                         conversationStore.deleteConversation(conversation.id)
                     }
                 }
                 .transition(.opacity)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
-                .padding(12)
             }
+
+            HStack(spacing: 8) {
+                Image(systemName: "tray")
+                    .font(.system(size: 11, weight: .regular))
+                    .foregroundColor(themeOnSurfaceVariant.opacity(0.55))
+                Text(timeLabel(for: conversation.updatedAt))
+                    .font(.system(size: 12))
+                    .foregroundColor(themeOnSurfaceVariant.opacity(0.8))
+                    .monospacedDigit()
+            }
+            .frame(minWidth: 64, alignment: .trailing)
         }
-        .aspectRatio(16 / 9, contentMode: .fit)
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
-        .opacity(isHovered ? 1.0 : 0.85)
-        .animation(.easeOut(duration: 0.2), value: isHovered)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(isHovered ? themeSurfaceContainerLow : Color.clear)
+        )
+        .animation(.easeOut(duration: 0.12), value: isHovered)
         .contentShape(Rectangle())
         .onTapGesture { selectedConversationId = conversation.id }
         .onHover { hovering in
-            hoveredPreviousCardId = hovering ? conversation.id : nil
+            hoveredPreviousRowId = hovering ? conversation.id : nil
             if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
         .contextMenu {
