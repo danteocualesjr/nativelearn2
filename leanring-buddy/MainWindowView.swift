@@ -66,6 +66,12 @@ struct MainWindowView: View {
     @State private var editingTitle: String = ""
     @State private var editingSummary: String = ""
     @State private var editingToolType: ConversationToolType = .webApp
+    @State private var editSheetItem: EditSheetItem?
+
+    /// Identifiable wrapper so we can drive `.sheet(item:)` with just a conversation id.
+    private struct EditSheetItem: Identifiable, Equatable {
+        let id: UUID
+    }
     @AppStorage("sidebarCollapsed") private var isSidebarCollapsed = false
     @AppStorage("userDisplayName") private var userDisplayName = "Dante"
     @AppStorage("profilePhotoPath") private var profilePhotoRelativePath = ""
@@ -100,6 +106,9 @@ struct MainWindowView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(themeSurface)
+        .sheet(item: $editSheetItem) { item in
+            editSessionSheet(for: item.id)
+        }
     }
 
     // MARK: - Sidebar
@@ -1419,6 +1428,162 @@ struct MainWindowView: View {
         editingCardId = nil
     }
 
+    // MARK: - Session Edit Sheet
+
+    /// Opens a modal sheet for editing a conversation. Used from list-style rows
+    /// (yesterday/previous) that don't have an inline-edit UI like the Today card.
+    private func openEditSheet(for conversation: Conversation) {
+        editingTitle = conversation.displayTitle
+        editingSummary = conversation.summary.isEmpty
+            ? (conversation.exchanges.first?.userTranscript ?? "")
+            : conversation.summary
+        editingToolType = conversation.resolvedToolType
+        editSheetItem = EditSheetItem(id: conversation.id)
+    }
+
+    private func saveEditSheet() {
+        guard let item = editSheetItem else { return }
+        let trimmedTitle = editingTitle.trimmingCharacters(in: .whitespaces)
+        let trimmedSummary = editingSummary.trimmingCharacters(in: .whitespaces)
+        conversationStore.updateConversation(
+            item.id,
+            title: trimmedTitle.isEmpty ? "Untitled" : trimmedTitle,
+            summary: trimmedSummary,
+            toolType: editingToolType
+        )
+        editSheetItem = nil
+    }
+
+    @ViewBuilder
+    private func editSessionSheet(for conversationId: UUID) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 10) {
+                Image(systemName: "pencil.line")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(themePrimary)
+                    .frame(width: 28, height: 28)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(themePrimary.opacity(0.1))
+                    )
+                Text("Edit session")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(themeOnSurface)
+                Spacer()
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("TITLE")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .tracking(1.2)
+                    .foregroundColor(neutralGray500)
+                TextField("Session title", text: $editingTitle, onCommit: { saveEditSheet() })
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14))
+                    .foregroundColor(themeOnSurface)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(themeSurfaceContainerLow)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(themeOutlineVariant.opacity(0.5), lineWidth: 1)
+                            )
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("SUMMARY")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .tracking(1.2)
+                    .foregroundColor(neutralGray500)
+                TextField("Short description", text: $editingSummary, onCommit: { saveEditSheet() })
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13))
+                    .foregroundColor(themeOnSurface)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(themeSurfaceContainerLow)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                    .stroke(themeOutlineVariant.opacity(0.5), lineWidth: 1)
+                            )
+                    )
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("TYPE")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .tracking(1.2)
+                    .foregroundColor(neutralGray500)
+                HStack(spacing: 6) {
+                    ForEach(ConversationToolType.allCases, id: \.self) { toolType in
+                        let isSelected = editingToolType == toolType
+                        Button {
+                            editingToolType = toolType
+                        } label: {
+                            HStack(spacing: 5) {
+                                Image(systemName: toolType.iconName)
+                                    .font(.system(size: 11))
+                                Text(toolType.displayName)
+                                    .font(.system(size: 11, weight: .medium))
+                            }
+                            .foregroundColor(isSelected ? .white : themeOnSurfaceVariant)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(
+                                Capsule().fill(
+                                    isSelected
+                                        ? (toolTypeColors[toolType] ?? neutralGray500)
+                                        : themeOnSurface.opacity(0.06)
+                                )
+                            )
+                        }
+                        .buttonStyle(.plain)
+                        .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+                    }
+                }
+            }
+
+            HStack {
+                Spacer()
+                Button {
+                    editSheetItem = nil
+                } label: {
+                    Text("Cancel")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(themeOnSurfaceVariant)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 7)
+                        .background(
+                            Capsule().fill(themeOnSurface.opacity(0.06))
+                        )
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.cancelAction)
+                .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+
+                Button { saveEditSheet() } label: {
+                    Text("Save")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 7)
+                        .background(Capsule().fill(themePrimary))
+                }
+                .buttonStyle(.plain)
+                .keyboardShortcut(.defaultAction)
+                .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+            }
+        }
+        .padding(24)
+        .frame(width: 420)
+        .background(themeSurface)
+    }
+
     private func todayConversationCard(_ conversation: Conversation) -> some View {
         let isHovered = hoveredCardId == conversation.id
         let isEditing = editingCardId == conversation.id
@@ -1592,6 +1757,7 @@ struct MainWindowView: View {
                 }
             }
             Divider()
+            Button("Edit…") { openEditSheet(for: conversation) }
             Button("Archive") { conversationStore.archiveConversation(conversation.id) }
             Button("Delete", role: .destructive) { conversationStore.deleteConversation(conversation.id) }
         }
@@ -1632,6 +1798,9 @@ struct MainWindowView: View {
 
             if isHovered {
                 HStack(spacing: 4) {
+                    sessionHoverButton(icon: "pencil", tooltip: "Edit") {
+                        openEditSheet(for: conversation)
+                    }
                     sessionHoverButton(icon: "archivebox", tooltip: "Archive") {
                         conversationStore.archiveConversation(conversation.id)
                     }
@@ -1676,6 +1845,7 @@ struct MainWindowView: View {
                 }
             }
             Divider()
+            Button("Edit…") { openEditSheet(for: conversation) }
             Button("Archive") { conversationStore.archiveConversation(conversation.id) }
             Button("Delete", role: .destructive) { conversationStore.deleteConversation(conversation.id) }
         }
@@ -1722,6 +1892,9 @@ struct MainWindowView: View {
 
             if isHovered {
                 HStack(spacing: 4) {
+                    sessionHoverButton(icon: "pencil", tooltip: "Edit") {
+                        openEditSheet(for: conversation)
+                    }
                     sessionHoverButton(icon: "archivebox", tooltip: "Archive") {
                         conversationStore.archiveConversation(conversation.id)
                     }
@@ -1764,6 +1937,7 @@ struct MainWindowView: View {
                 }
             }
             Divider()
+            Button("Edit…") { openEditSheet(for: conversation) }
             Button("Archive") { conversationStore.archiveConversation(conversation.id) }
             Button("Delete", role: .destructive) { conversationStore.deleteConversation(conversation.id) }
         }
