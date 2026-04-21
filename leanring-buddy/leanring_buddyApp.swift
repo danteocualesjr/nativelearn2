@@ -23,6 +23,7 @@ struct leanring_buddyApp: App {
 final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
     private var menuBarPanelManager: MenuBarPanelManager?
     private var mainWindow: NSWindow?
+    private var fontScaleKeyMonitor: Any?
     let companionManager = CompanionManager()
     let conversationStore = ConversationStore()
 
@@ -47,6 +48,8 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
 
         registerAsLoginItemIfNeeded()
         createAndShowMainWindow()
+
+        fontScaleKeyMonitor = FontScaleKeyboardMonitor.install()
     }
 
     /// Keep the app running when the main window is closed.
@@ -69,6 +72,10 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         companionManager.stop()
+        if let monitor = fontScaleKeyMonitor {
+            NSEvent.removeMonitor(monitor)
+            fontScaleKeyMonitor = nil
+        }
     }
 
     private func reassertOverlayWindows() {
@@ -81,10 +88,12 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - Main Window
 
     private func createAndShowMainWindow() {
-        let contentView = MainWindowView(
-            conversationStore: conversationStore,
-            companionManager: companionManager
-        )
+        let contentView = ZoomableContainer { [conversationStore, companionManager] in
+            MainWindowView(
+                conversationStore: conversationStore,
+                companionManager: companionManager
+            )
+        }
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1000, height: 650),
