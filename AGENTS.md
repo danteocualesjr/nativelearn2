@@ -15,21 +15,21 @@ Push-to-talk (Control+Option) captures voice, transcribes it, sends it with a sc
 
 All API keys live on a Cloudflare Worker proxy — nothing sensitive ships in the app binary.
 
-### Forked From
+### Product Notes
 
-Built on top of [Clicky](https://github.com/farzaa/clicky) by Farza. Major changes from the original:
+Key product decisions that shape the current implementation:
 
-- Rebranded from "Clicky" to "Vibecademy" with AI tutor persona "Sparkle"
-- Changed companion icon from blue triangle to orange sparkle
-- Changed from menu-bar-only app to full desktop app with main window (`LSUIElement=false`)
-- Added persistent conversation storage (JSON files in Application Support)
-- Added desktop window with sidebar navigation (Home, Chat, Spaces) and conversation history
-- Added Sparkle on/off toggle — Sparkle is off by default, user activates from the desktop app
-- Changed TTS voice to young British female (ElevenLabs "Charlotte" voice: `XB0fDUnXU5powFXDhCwa`)
-- Removed Sparkle auto-update framework
-- Removed onboarding video, replaced with text-based instructions
-- Made menu bar panel draggable
-- Updated system prompts for Sparkle's AI tutor persona
+- Brand is "Vibecademy" with AI tutor persona "Sparkle"
+- Companion icon is an orange sparkle (not a geometric shape)
+- Full desktop app with main window (`LSUIElement=false`), plus a menu bar status item as a secondary surface
+- Persistent conversation storage (JSON files in Application Support)
+- Desktop window with sidebar navigation (Home, Chat, Spaces) and conversation history
+- Sparkle on/off toggle — Sparkle is off by default, user activates from the desktop app
+- TTS voice is a young British female (ElevenLabs "Charlotte" voice: `XB0fDUnXU5powFXDhCwa`)
+- No auto-update framework
+- No onboarding video — text-based instructions only
+- Menu bar panel is draggable
+- System prompts are tuned for Sparkle's AI tutor persona
 
 ## Architecture
 
@@ -45,7 +45,7 @@ Built on top of [Clicky](https://github.com/farzaa/clicky) by Farza. Major chang
 - **Element Pointing**: Claude embeds one or more inline `[POINT:x,y:label:screenN]` tags in responses. For multi-point responses, all TTS audio segments are pre-fetched in parallel, then played sequentially — Sparkle flies to each tagged location via bezier arc before speaking the surrounding text. Single-point responses (one trailing tag) follow the original path. `CompanionManager.isMultiPointSequenceActive` tells the overlay to skip its auto-return-to-cursor between points.
 - **Conversation Persistence**: JSON files in `~/Library/Application Support/Vibecademy/`. Conversations are auto-saved during voice interactions and grouped by date in the UI.
 - **Concurrency**: `@MainActor` isolation, async/await throughout
-- **Analytics**: PostHog via `ClickyAnalytics.swift`
+- **Analytics**: PostHog via `VibecademyAnalytics.swift`
 
 ### API Proxy (Cloudflare Worker)
 
@@ -102,7 +102,7 @@ Worker vars: `ELEVENLABS_VOICE_ID` (set to `XB0fDUnXU5powFXDhCwa` — Charlotte 
 | `ElevenLabsTTSClient.swift` | ~106 | ElevenLabs TTS client. Sends text to the Worker proxy, plays back audio via `AVAudioPlayer`. Supports preloading audio via `fetchAudioData` for multi-point segment playback. Exposes `isPlaying` and `waitForPlaybackCompletion` for sequencing. |
 | `ElementLocationDetector.swift` | ~335 | Detects UI element locations in screenshots for cursor pointing. |
 | `DesignSystem.swift` | ~879 | Design system tokens — colors, corner radii, shared styles. All UI references `DS.Colors`, `DS.CornerRadius`, etc. `overlayCursorBlue` is actually orange (`#FF8C33`), used for the sparkle icon. |
-| `ClickyAnalytics.swift` | ~122 | PostHog analytics integration (`VibecademyAnalytics`) for usage tracking. |
+| `VibecademyAnalytics.swift` | ~122 | PostHog analytics integration (`VibecademyAnalytics`) for usage tracking. |
 | `WindowPositionManager.swift` | ~262 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
 | `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader for keys stored in the app bundle Info.plist. |
 | `worker/src/index.ts` | ~142 | Cloudflare Worker proxy. Three routes: `/chat` (Claude), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). |

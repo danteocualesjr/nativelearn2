@@ -1,5 +1,5 @@
 //
-//  ClickyAnalytics.swift
+//  VibecademyAnalytics.swift
 //  leanring-buddy
 //
 //  Centralized PostHog analytics wrapper. All event names and properties

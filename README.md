@@ -67,7 +67,3 @@ open leanring-buddy.xcodeproj
 4. Ask Sparkle something like: "Hey Sparkle, I want to learn how to use Cursor. Can you show me?"
 5. Sparkle will see your screen, talk back to you, and point at relevant UI elements
 6. Your conversations are automatically saved — find them in the desktop app grouped by date
-
-## Based on
-
-Built on top of [Clicky](https://github.com/farzaa/clicky) by Farza.
