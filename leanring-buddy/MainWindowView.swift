@@ -42,6 +42,39 @@ private let toolTypeColors: [ConversationToolType: Color] = [
     .aiAgent: Color(hex: "#b72301"),
 ]
 
+// MARK: - Display Density
+
+/// Controls how much visual breathing room list-style session rows get.
+/// Persisted via `@AppStorage("displayDensity")` so the choice is shared
+/// between `MainWindowView` and the Preferences picker in `ProfileDetailView`.
+enum DisplayDensity: String, CaseIterable, Identifiable {
+    case comfortable
+    case compact
+
+    var id: String { rawValue }
+
+    var displayName: String {
+        switch self {
+        case .comfortable: return "Comfortable"
+        case .compact:     return "Compact"
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .comfortable: return "list.dash"
+        case .compact:     return "list.bullet"
+        }
+    }
+
+    var description: String {
+        switch self {
+        case .comfortable: return "Roomier spacing, easier on the eyes."
+        case .compact:     return "Tighter spacing so more sessions fit on screen."
+        }
+    }
+}
+
 private func iconForConversation(_ conversation: Conversation) -> String {
     conversation.resolvedToolType.iconName
 }
@@ -79,6 +112,11 @@ struct MainWindowView: View {
     @AppStorage("sidebarCollapsed") private var isSidebarCollapsed = false
     @AppStorage("userDisplayName") private var userDisplayName = "Dante"
     @AppStorage("profilePhotoPath") private var profilePhotoRelativePath = ""
+    @AppStorage("displayDensity") private var displayDensityRaw: String = DisplayDensity.comfortable.rawValue
+
+    private var density: DisplayDensity {
+        DisplayDensity(rawValue: displayDensityRaw) ?? .comfortable
+    }
 
     enum SidebarItem: Hashable {
         case home
@@ -1927,22 +1965,32 @@ struct MainWindowView: View {
         let conversationColor = colorForConversation(conversation)
         let exchangeCount = conversation.exchanges.count
 
-        return HStack(spacing: 16) {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+        let isCompact = density == .compact
+        let rowSpacing: CGFloat = isCompact ? 12 : 16
+        let iconSize: CGFloat = isCompact ? 32 : 40
+        let iconCorner: CGFloat = isCompact ? 10 : 12
+        let iconGlyphSize: CGFloat = isCompact ? 14 : 16
+        let titleFontSize: CGFloat = isCompact ? 13 : 14
+        let subtitleFontSize: CGFloat = isCompact ? 11 : 12
+        let outerPadding: CGFloat = isCompact ? 10 : 16
+        let outerCorner: CGFloat = isCompact ? 12 : 16
+
+        return HStack(spacing: rowSpacing) {
+            RoundedRectangle(cornerRadius: iconCorner, style: .continuous)
                 .fill(conversationColor.opacity(0.1))
-                .frame(width: 40, height: 40)
+                .frame(width: iconSize, height: iconSize)
                 .overlay(
                     Image(systemName: conversationIcon)
-                        .font(.system(size: 16))
+                        .font(.system(size: iconGlyphSize))
                         .foregroundColor(conversationColor)
                 )
 
             VStack(alignment: .leading, spacing: 2) {
                 if inlineRenameId == conversation.id {
-                    inlineRenameField(font: .system(size: 14, weight: .semibold, design: .rounded))
+                    inlineRenameField(font: .system(size: titleFontSize, weight: .semibold, design: .rounded))
                 } else {
                     Text(conversation.displayTitle)
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .font(.system(size: titleFontSize, weight: .semibold, design: .rounded))
                         .foregroundColor(themeOnSurface)
                         .lineLimit(1)
                         .contentShape(Rectangle())
@@ -1953,7 +2001,7 @@ struct MainWindowView: View {
                         )
                 }
                 Text(conversationSubtitle(conversation))
-                    .font(.system(size: 12))
+                    .font(.system(size: subtitleFontSize))
                     .foregroundColor(themeOnSurfaceVariant)
                     .lineLimit(1)
             }
@@ -1989,9 +2037,9 @@ struct MainWindowView: View {
                 .foregroundColor(themeOnSurfaceVariant)
                 .opacity(isHovered ? 1 : 0)
         }
-        .padding(16)
+        .padding(outerPadding)
         .background(
-            RoundedRectangle(cornerRadius: 16, style: .continuous)
+            RoundedRectangle(cornerRadius: outerCorner, style: .continuous)
                 .fill(isHovered ? themeSurfaceContainerLow : Color.clear)
         )
         .animation(.easeOut(duration: 0.15), value: isHovered)
@@ -2033,11 +2081,20 @@ struct MainWindowView: View {
         let trimmedName = userDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
         let ownerLabel = trimmedName.isEmpty ? "Me" : trimmedName
 
-        return HStack(spacing: 12) {
+        let isCompact = density == .compact
+        let rowSpacing: CGFloat = isCompact ? 10 : 12
+        let iconFrame: CGFloat = isCompact ? 24 : 28
+        let iconGlyphSize: CGFloat = isCompact ? 12 : 14
+        let titleFontSize: CGFloat = isCompact ? 12.5 : 13.5
+        let ownerFontSize: CGFloat = isCompact ? 10.5 : 11
+        let horizontalPadding: CGFloat = isCompact ? 10 : 12
+        let verticalPadding: CGFloat = isCompact ? 5 : 9
+
+        return HStack(spacing: rowSpacing) {
             Image(systemName: "doc.text")
-                .font(.system(size: 14, weight: .regular))
+                .font(.system(size: iconGlyphSize, weight: .regular))
                 .foregroundColor(themeOnSurfaceVariant.opacity(0.75))
-                .frame(width: 28, height: 28)
+                .frame(width: iconFrame, height: iconFrame)
                 .background(
                     RoundedRectangle(cornerRadius: 6, style: .continuous)
                         .stroke(themeOutlineVariant.opacity(0.35), lineWidth: 1)
@@ -2045,10 +2102,10 @@ struct MainWindowView: View {
 
             VStack(alignment: .leading, spacing: 1) {
                 if inlineRenameId == conversation.id {
-                    inlineRenameField(font: .system(size: 13.5, weight: .semibold))
+                    inlineRenameField(font: .system(size: titleFontSize, weight: .semibold))
                 } else {
                     Text(conversation.displayTitle)
-                        .font(.system(size: 13.5, weight: .semibold))
+                        .font(.system(size: titleFontSize, weight: .semibold))
                         .foregroundColor(themeOnSurface)
                         .lineLimit(1)
                         .contentShape(Rectangle())
@@ -2059,7 +2116,7 @@ struct MainWindowView: View {
                         )
                 }
                 Text(ownerLabel)
-                    .font(.system(size: 11))
+                    .font(.system(size: ownerFontSize))
                     .foregroundColor(themeOnSurfaceVariant.opacity(0.65))
                     .lineLimit(1)
             }
@@ -2092,8 +2149,8 @@ struct MainWindowView: View {
             }
             .frame(minWidth: 64, alignment: .trailing)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
+        .padding(.horizontal, horizontalPadding)
+        .padding(.vertical, verticalPadding)
         .background(
             RoundedRectangle(cornerRadius: 8, style: .continuous)
                 .fill(isHovered ? themeSurfaceContainerLow : Color.clear)
@@ -2612,6 +2669,7 @@ private struct ProfileDetailView: View {
     @State private var showingDeleteAllConfirmation = false
     @AppStorage("userEmail") private var persistedEmail = ""
     @AppStorage("profilePhotoPath") private var profilePhotoRelativePath = ""
+    @AppStorage("displayDensity") private var displayDensityRaw: String = DisplayDensity.comfortable.rawValue
 
     private static let profilePhotosDirectory: URL = {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -2721,6 +2779,10 @@ private struct ProfileDetailView: View {
                     profileSectionHeader("Preferences")
 
                     preferredModelPicker
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 28)
+
+                    densityPicker
                         .padding(.horizontal, 32)
                         .padding(.bottom, 40)
 
@@ -2886,6 +2948,68 @@ private struct ProfileDetailView: View {
                 .font(.system(size: 12))
                 .foregroundColor(themeOnSurfaceVariant.opacity(0.8))
         }
+    }
+
+    // MARK: - Density Picker
+
+    private var densityPicker: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Session list density")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(themeOnSurfaceVariant)
+
+            HStack(spacing: 12) {
+                ForEach(DisplayDensity.allCases) { option in
+                    densityPickerButton(option)
+                }
+            }
+
+            Text("Changes spacing and type size in the Yesterday and Previous session lists.")
+                .font(.system(size: 12))
+                .foregroundColor(themeOnSurfaceVariant.opacity(0.8))
+        }
+    }
+
+    private func densityPickerButton(_ option: DisplayDensity) -> some View {
+        let isSelected = displayDensityRaw == option.rawValue
+        return Button {
+            displayDensityRaw = option.rawValue
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: option.iconName)
+                    .font(.system(size: 16))
+                    .foregroundColor(isSelected ? themeTertiary : neutralGray500)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(option.displayName)
+                        .font(.system(size: 14, weight: isSelected ? .semibold : .medium))
+                        .foregroundColor(isSelected ? themeOnSurface : neutralGray600)
+                    Text(option.description)
+                        .font(.system(size: 11))
+                        .foregroundColor(themeOnSurfaceVariant.opacity(0.7))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(themeTertiary)
+                        .font(.system(size: 16))
+                }
+            }
+            .padding(14)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(isSelected ? themeTertiary.opacity(0.08) : themeSurfaceContainerHigh)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(isSelected ? themeTertiary.opacity(0.3) : Color.clear, lineWidth: 1.5)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
     }
 
     private func modelPickerButton(label: String, subtitle: String, modelId: String, icon: String) -> some View {
