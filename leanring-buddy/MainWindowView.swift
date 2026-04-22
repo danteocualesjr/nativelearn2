@@ -68,6 +68,9 @@ struct MainWindowView: View {
     @State private var editingToolType: ConversationToolType = .webApp
     @State private var editSheetItem: EditSheetItem?
     @State private var dropTargetSpaceId: UUID?
+    @State private var inlineRenameId: UUID?
+    @State private var inlineRenameText: String = ""
+    @FocusState private var isInlineRenameFocused: Bool
 
     /// Identifiable wrapper so we can drive `.sheet(item:)` with just a conversation id.
     private struct EditSheetItem: Identifiable, Equatable {
@@ -1469,6 +1472,83 @@ struct MainWindowView: View {
         editingCardId = nil
     }
 
+    // MARK: - Inline Title Rename
+
+    /// Enters inline-rename mode for a conversation: used by list rows
+    /// (yesterday / previous) on title double-click. The Today card has
+    /// its own full edit mode, which double-click routes to instead.
+    private func beginInlineRename(for conversation: Conversation) {
+        // Committing any stale rename first avoids dropping edits when the
+        // user double-clicks a different row before hitting return.
+        if inlineRenameId != nil, inlineRenameId != conversation.id {
+            commitInlineRename()
+        }
+        inlineRenameText = conversation.displayTitle
+        inlineRenameId = conversation.id
+        // Focus on the next runloop so the TextField exists before we set focus.
+        DispatchQueue.main.async { self.isInlineRenameFocused = true }
+    }
+
+    private func commitInlineRename() {
+        guard let id = inlineRenameId,
+              let conversation = conversationStore.conversations.first(where: { $0.id == id })
+        else {
+            inlineRenameId = nil
+            return
+        }
+        let trimmed = inlineRenameText.trimmingCharacters(in: .whitespaces)
+        let newTitle = trimmed.isEmpty ? "Untitled" : trimmed
+        // Only hit the store if the title actually changed.
+        if newTitle != conversation.title {
+            conversationStore.updateConversation(
+                id,
+                title: newTitle,
+                summary: conversation.summary,
+                toolType: conversation.resolvedToolType
+            )
+        }
+        inlineRenameId = nil
+    }
+
+    private func cancelInlineRename() {
+        inlineRenameId = nil
+        inlineRenameText = ""
+    }
+
+    /// Shared styling for the inline-rename TextField. Callers pass the
+    /// font that matches their row's title so the field visually replaces
+    /// the `Text` without reflowing the row.
+    @ViewBuilder
+    private func inlineRenameField(font: Font) -> some View {
+        TextField("Title", text: $inlineRenameText)
+            .textFieldStyle(.plain)
+            .focused($isInlineRenameFocused)
+            .font(font)
+            .foregroundColor(themeOnSurface)
+            .padding(.vertical, 2)
+            .padding(.horizontal, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(themeSurfaceContainerLow)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(themePrimary.opacity(0.45), lineWidth: 1)
+                    )
+            )
+            .onSubmit { commitInlineRename() }
+            .onExitCommand { cancelInlineRename() }
+            .onChange(of: isInlineRenameFocused) { focused in
+                // Blurring the field (click elsewhere) commits, matching
+                // Finder-style rename behavior.
+                if !focused, inlineRenameId != nil {
+                    commitInlineRename()
+                }
+            }
+            // Swallow single-tap so clicking inside the field doesn't bubble
+            // up to the row's `.onTapGesture { selectedConversationId = ... }`.
+            .onTapGesture { }
+    }
+
     // MARK: - Drag & Drop
 
     /// Receives an `NSItemProvider` from a session row drag and moves the
@@ -1719,6 +1799,12 @@ struct MainWindowView: View {
                     .foregroundColor(themeOnSurface)
                     .lineLimit(1)
                     .padding(.bottom, 6)
+                    .contentShape(Rectangle())
+                    .highPriorityGesture(
+                        TapGesture(count: 2).onEnded {
+                            enterEditMode(for: conversation)
+                        }
+                    )
             }
 
             if !isEditing {
@@ -1824,6 +1910,7 @@ struct MainWindowView: View {
                 }
             }
             Divider()
+            Button("Rename") { beginInlineRename(for: conversation) }
             Button("Edit…") { openEditSheet(for: conversation) }
             Button("Archive") { conversationStore.archiveConversation(conversation.id) }
             Button("Delete", role: .destructive) { conversationStore.deleteConversation(conversation.id) }
@@ -1851,10 +1938,20 @@ struct MainWindowView: View {
                 )
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(conversation.displayTitle)
-                    .font(.system(size: 14, weight: .semibold, design: .rounded))
-                    .foregroundColor(themeOnSurface)
-                    .lineLimit(1)
+                if inlineRenameId == conversation.id {
+                    inlineRenameField(font: .system(size: 14, weight: .semibold, design: .rounded))
+                } else {
+                    Text(conversation.displayTitle)
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundColor(themeOnSurface)
+                        .lineLimit(1)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(
+                            TapGesture(count: 2).onEnded {
+                                beginInlineRename(for: conversation)
+                            }
+                        )
+                }
                 Text(conversationSubtitle(conversation))
                     .font(.system(size: 12))
                     .foregroundColor(themeOnSurfaceVariant)
@@ -1913,6 +2010,7 @@ struct MainWindowView: View {
                 }
             }
             Divider()
+            Button("Rename") { beginInlineRename(for: conversation) }
             Button("Edit…") { openEditSheet(for: conversation) }
             Button("Archive") { conversationStore.archiveConversation(conversation.id) }
             Button("Delete", role: .destructive) { conversationStore.deleteConversation(conversation.id) }
@@ -1946,10 +2044,20 @@ struct MainWindowView: View {
                 )
 
             VStack(alignment: .leading, spacing: 1) {
-                Text(conversation.displayTitle)
-                    .font(.system(size: 13.5, weight: .semibold))
-                    .foregroundColor(themeOnSurface)
-                    .lineLimit(1)
+                if inlineRenameId == conversation.id {
+                    inlineRenameField(font: .system(size: 13.5, weight: .semibold))
+                } else {
+                    Text(conversation.displayTitle)
+                        .font(.system(size: 13.5, weight: .semibold))
+                        .foregroundColor(themeOnSurface)
+                        .lineLimit(1)
+                        .contentShape(Rectangle())
+                        .highPriorityGesture(
+                            TapGesture(count: 2).onEnded {
+                                beginInlineRename(for: conversation)
+                            }
+                        )
+                }
                 Text(ownerLabel)
                     .font(.system(size: 11))
                     .foregroundColor(themeOnSurfaceVariant.opacity(0.65))
@@ -2006,6 +2114,7 @@ struct MainWindowView: View {
                 }
             }
             Divider()
+            Button("Rename") { beginInlineRename(for: conversation) }
             Button("Edit…") { openEditSheet(for: conversation) }
             Button("Archive") { conversationStore.archiveConversation(conversation.id) }
             Button("Delete", role: .destructive) { conversationStore.deleteConversation(conversation.id) }
