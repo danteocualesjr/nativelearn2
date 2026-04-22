@@ -67,6 +67,7 @@ struct MainWindowView: View {
     @State private var editingSummary: String = ""
     @State private var editingToolType: ConversationToolType = .webApp
     @State private var editSheetItem: EditSheetItem?
+    @State private var dropTargetSpaceId: UUID?
 
     /// Identifiable wrapper so we can drive `.sheet(item:)` with just a conversation id.
     private struct EditSheetItem: Identifiable, Equatable {
@@ -202,15 +203,34 @@ struct MainWindowView: View {
                     .padding(.bottom, 8)
 
                 ForEach(conversationStore.spaces) { space in
-                    sidebarNavRow(item: .space(space.id), icon: "folder", label: space.name)
-                        .contextMenu {
-                            Button("Delete Space", role: .destructive) {
-                                conversationStore.deleteSpace(space.id)
-                                if case .space(let id) = sidebarSelection, id == space.id {
-                                    sidebarSelection = .home
-                                }
+                    let isTargeted = Binding<Bool>(
+                        get: { dropTargetSpaceId == space.id },
+                        set: { newValue in
+                            if newValue {
+                                dropTargetSpaceId = space.id
+                            } else if dropTargetSpaceId == space.id {
+                                dropTargetSpaceId = nil
                             }
                         }
+                    )
+
+                    sidebarNavRow(
+                        item: .space(space.id),
+                        icon: "folder",
+                        label: space.name,
+                        isDropTargeted: dropTargetSpaceId == space.id
+                    )
+                    .onDrop(of: [.text], isTargeted: isTargeted) { providers in
+                        handleSessionDrop(providers: providers, toSpace: space.id)
+                    }
+                    .contextMenu {
+                        Button("Delete Space", role: .destructive) {
+                            conversationStore.deleteSpace(space.id)
+                            if case .space(let id) = sidebarSelection, id == space.id {
+                                sidebarSelection = .home
+                            }
+                        }
+                    }
                 }
 
                 if isCreatingSpace {
@@ -394,26 +414,47 @@ struct MainWindowView: View {
         }
     }
 
-    private func sidebarNavRow(item: SidebarItem, icon: String, label: String) -> some View {
+    private func sidebarNavRow(
+        item: SidebarItem,
+        icon: String,
+        label: String,
+        isDropTargeted: Bool = false
+    ) -> some View {
         let isSelected = sidebarSelection == item
         let isHovered = hoveredSidebarItem == item
         let filledIcon = isSelected ? (icon.hasSuffix(".fill") ? icon : icon + ".fill") : icon
+        let iconColor = isDropTargeted
+            ? themePrimary
+            : (isSelected ? themePrimary : neutralGray500)
+        let textColor = isDropTargeted
+            ? themePrimary
+            : (isSelected ? Color(hex: "#0f172a") : neutralGray500)
+        let textWeight: Font.Weight = (isSelected || isDropTargeted) ? .semibold : .medium
 
         return HStack(spacing: 12) {
             Image(systemName: filledIcon)
                 .font(.system(size: 14))
-                .foregroundColor(isSelected ? themePrimary : neutralGray500)
+                .foregroundColor(iconColor)
             Text(label)
-                .font(.system(size: 13, weight: isSelected ? .semibold : .medium))
-                .foregroundColor(isSelected ? Color(hex: "#0f172a") : neutralGray500)
+                .font(.system(size: 13, weight: textWeight))
+                .foregroundColor(textColor)
             Spacer()
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(isSelected ? sidebarHoverBg : (isHovered ? sidebarHoverBg.opacity(0.5) : Color.clear))
+                .fill(
+                    isDropTargeted
+                        ? themePrimary.opacity(0.12)
+                        : (isSelected ? sidebarHoverBg : (isHovered ? sidebarHoverBg.opacity(0.5) : Color.clear))
+                )
         )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .strokeBorder(themePrimary.opacity(isDropTargeted ? 0.6 : 0), lineWidth: 1.5)
+        )
+        .animation(.easeOut(duration: 0.12), value: isDropTargeted)
         .contentShape(Rectangle())
         .onTapGesture {
             sidebarSelection = item
@@ -1428,6 +1469,31 @@ struct MainWindowView: View {
         editingCardId = nil
     }
 
+    // MARK: - Drag & Drop
+
+    /// Receives an `NSItemProvider` from a session row drag and moves the
+    /// conversation into the target space. The drag payload is the
+    /// conversation's `UUID` serialized as plain text so we don't have to
+    /// register a custom UTType (which would require Info.plist changes).
+    /// Any non-UUID text is silently ignored.
+    private func handleSessionDrop(providers: [NSItemProvider], toSpace spaceId: UUID) -> Bool {
+        guard let provider = providers.first else { return false }
+        provider.loadObject(ofClass: NSString.self) { item, _ in
+            guard let raw = item as? String,
+                  let uuid = UUID(uuidString: raw) else { return }
+            DispatchQueue.main.async {
+                guard conversationStore.conversations.contains(where: { $0.id == uuid }) else { return }
+                conversationStore.moveConversation(uuid, toSpace: spaceId)
+            }
+        }
+        return true
+    }
+
+    /// Builds the `NSItemProvider` used as the drag payload for a session.
+    private func sessionDragProvider(for conversation: Conversation) -> NSItemProvider {
+        NSItemProvider(object: conversation.id.uuidString as NSString)
+    }
+
     // MARK: - Session Edit Sheet
 
     /// Opens a modal sheet for editing a conversation. Used from list-style rows
@@ -1747,6 +1813,7 @@ struct MainWindowView: View {
         }
         .shadow(color: Color.black.opacity(isHovered ? 0.08 : 0), radius: 16, y: 4)
         .animation(.easeOut(duration: 0.3), value: isHovered)
+        .onDrag { sessionDragProvider(for: conversation) }
         .contextMenu {
             Button("Edit") { enterEditMode(for: conversation) }
             Divider()
@@ -1837,6 +1904,7 @@ struct MainWindowView: View {
             hoveredYesterdayRowId = hovering ? conversation.id : nil
             if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
+        .onDrag { sessionDragProvider(for: conversation) }
         .contextMenu {
             Menu("Move to Space") {
                 Button("None") { conversationStore.moveConversation(conversation.id, toSpace: nil) }
@@ -1929,6 +1997,7 @@ struct MainWindowView: View {
             hoveredPreviousRowId = hovering ? conversation.id : nil
             if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
         }
+        .onDrag { sessionDragProvider(for: conversation) }
         .contextMenu {
             Menu("Move to Space") {
                 Button("None") { conversationStore.moveConversation(conversation.id, toSpace: nil) }
