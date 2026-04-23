@@ -638,15 +638,18 @@ struct MainWindowView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 0) {
-                        welcomeHeader
-                            .padding(.horizontal, 32)
-                            .padding(.bottom, 12)
+                        if selectedTopTab != "Insights" {
+                            welcomeHeader
+                                .padding(.horizontal, 32)
+                                .padding(.bottom, 12)
+                        }
 
                         switch selectedTopTab {
                         case "Academy":
                             academyTabContent
                         case "Insights":
-                            insightsPlaceholder
+                            InsightsView(conversationStore: conversationStore)
+                                .padding(.top, 32)
                         default:
                             dashboardTabContent(
                                 todayGroup: todayGroup,
@@ -741,26 +744,6 @@ struct MainWindowView: View {
                 noSearchResultsView
             }
         }
-    }
-
-    // MARK: - Insights Placeholder
-
-    private var insightsPlaceholder: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "chart.bar.xaxis")
-                .font(.system(size: 48))
-                .foregroundColor(neutralGray400)
-            Text("Insights coming soon")
-                .font(.system(size: 17, weight: .semibold))
-                .foregroundColor(themeOnSurfaceVariant)
-            Text("Track your learning patterns, strengths, and areas for growth.")
-                .font(.system(size: 13))
-                .foregroundColor(neutralGray400)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.top, 80)
-        .padding(.horizontal, 32)
     }
 
     // MARK: - Academy Tab
