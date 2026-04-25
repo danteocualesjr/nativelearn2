@@ -655,7 +655,7 @@ struct InsightsView: View {
                     .font(.system(size: 44, weight: .bold))
                     .foregroundColor(insightsOnSurface)
                     .tracking(-1.5)
-                Text(snapshot.currentStreak == 1 ? "day current streak" : "day current streak")
+                Text(snapshot.currentStreak == 1 ? "day current streak" : "days current streak")
                     .font(.system(size: 12))
                     .foregroundColor(insightsOnSurfaceVariant)
             }
