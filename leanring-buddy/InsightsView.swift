@@ -411,13 +411,17 @@ struct InsightsView: View {
         let leadingOffset = totalDays + trailingBlanks
         let weekCount = Int(ceil(Double(leadingOffset) / 7.0))
 
+        // Walk back from today so each date lands on its real weekday row.
+        // The current week sits in the rightmost column; today is at row
+        // `weekdayOfToday - 1`. Earlier dates step backwards through rows
+        // (with positive modulo) and into earlier columns as the week resets.
         var cells: [[HeatmapCell]] = Array(repeating: Array(repeating: .empty, count: weekCount), count: 7)
         for dayIndex in 0..<totalDays {
-            guard let date = calendar.date(byAdding: .day, value: -(totalDays - 1 - dayIndex), to: today) else { continue }
-            let absoluteIndex = dayIndex + (leadingOffset - totalDays)
-            let col = absoluteIndex / 7
-            let row = absoluteIndex % 7
-            guard row < 7, col < weekCount else { continue }
+            let daysAgo = totalDays - 1 - dayIndex
+            guard let date = calendar.date(byAdding: .day, value: -daysAgo, to: today) else { continue }
+            let row = ((weekdayOfToday - 1 - daysAgo) % 7 + 7) % 7
+            let col = (weekCount - 1) - ((daysAgo + trailingBlanks) / 7)
+            guard row >= 0, row < 7, col >= 0, col < weekCount else { continue }
             let count = snapshot.sessionsPerDay[date] ?? 0
             cells[row][col] = .day(date: date, count: count)
         }
@@ -434,7 +438,7 @@ struct InsightsView: View {
             }
 
             VStack(alignment: .leading, spacing: 6) {
-                monthLabelRow(weekCount: weekCount, calendar: calendar, today: today, leadingOffset: leadingOffset)
+                monthLabelRow(weekCount: weekCount, calendar: calendar, cells: cells)
                 HStack(alignment: .top, spacing: 4) {
                     ForEach(0..<weekCount, id: \.self) { col in
                         VStack(spacing: 4) {
@@ -470,19 +474,26 @@ struct InsightsView: View {
         }
     }
 
-    private func monthLabelRow(weekCount: Int, calendar: Calendar, today: Date, leadingOffset: Int) -> some View {
+    private func monthLabelRow(weekCount: Int, calendar: Calendar, cells: [[HeatmapCell]]) -> some View {
         let formatter = DateFormatter()
         formatter.dateFormat = "MMM"
 
+        // Use the earliest populated date in each column as that column's
+        // canonical date. Reading from `cells` keeps the labels in sync with
+        // whatever placement logic the grid uses, even for partial weeks at
+        // the start/end of the range.
         var labels: [(col: Int, text: String)] = []
         var lastMonth: Int = -1
-        let totalDays = stats.range.heatmapDays
         for col in 0..<weekCount {
-            let absoluteDayIndex = col * 7
-            let dayOffsetFromStart = absoluteDayIndex - (leadingOffset - totalDays)
-            guard dayOffsetFromStart >= 0,
-                  let date = calendar.date(byAdding: .day, value: -(totalDays - 1 - dayOffsetFromStart), to: today)
-            else { continue }
+            var earliestDateInColumn: Date? = nil
+            for row in 0..<7 {
+                if case .day(let date, _) = cells[row][col] {
+                    if earliestDateInColumn == nil || date < earliestDateInColumn! {
+                        earliestDateInColumn = date
+                    }
+                }
+            }
+            guard let date = earliestDateInColumn else { continue }
             let month = calendar.component(.month, from: date)
             if month != lastMonth {
                 labels.append((col, formatter.string(from: date)))

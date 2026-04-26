@@ -2580,14 +2580,27 @@ struct MainWindowView: View {
 
         guard !uniqueConversationDays.isEmpty else { return 0 }
 
+        // Streak should still count if the user spoke yesterday but hasn't
+        // talked yet today (matches the InsightsView "started yesterday"
+        // carry-over so the Home dashboard and Insights tab agree).
         var streak = 0
-        var expectedDate = calendar.startOfDay(for: Date())
+        let today = calendar.startOfDay(for: Date())
+        var expectedDate = today
+        var startedFromYesterday = false
 
         for date in uniqueConversationDays {
             if date == expectedDate {
                 streak += 1
                 guard let previousDay = calendar.date(byAdding: .day, value: -1, to: expectedDate) else { break }
                 expectedDate = previousDay
+            } else if streak == 0,
+                      !startedFromYesterday,
+                      let yesterday = calendar.date(byAdding: .day, value: -1, to: today),
+                      date == yesterday {
+                startedFromYesterday = true
+                streak = 1
+                guard let dayBeforeYesterday = calendar.date(byAdding: .day, value: -1, to: yesterday) else { break }
+                expectedDate = dayBeforeYesterday
             } else if date < expectedDate {
                 break
             }
