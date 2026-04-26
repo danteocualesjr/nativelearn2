@@ -142,12 +142,25 @@ class ClaudeAPI {
         ])
         messages.append(["role": "user", "content": contentBlocks])
 
+        // Advertise Anthropic's hosted web search tool. Claude only invokes it when
+        // a question genuinely needs current information (the system prompt also
+        // gates this). max_uses caps the number of searches per turn so a single
+        // exchange can't run away on cost — Anthropic bills ~$10 per 1,000 searches.
+        // max_tokens is bumped to 2048 because search responses tend to be longer
+        // (Claude inlines findings + a brief synthesis).
         let body: [String: Any] = [
             "model": model,
-            "max_tokens": 1024,
+            "max_tokens": 2048,
             "stream": true,
             "system": systemPrompt,
-            "messages": messages
+            "messages": messages,
+            "tools": [
+                [
+                    "type": "web_search_20250305",
+                    "name": "web_search",
+                    "max_uses": 3
+                ]
+            ]
         ]
 
         let bodyData = try JSONSerialization.data(withJSONObject: body)
@@ -182,6 +195,14 @@ class ClaudeAPI {
 
         // Parse SSE stream — each event is "data: {json}\n\n"
         var accumulatedResponseText = ""
+        // Track which content block the most recent text_delta belonged to. With
+        // the web_search tool enabled, Claude's response is split across multiple
+        // content blocks (text → server_tool_use → web_search_tool_result → text).
+        // When we cross from one text block into another we insert a space so the
+        // joined output doesn't fuse two blocks together (e.g. "let me check" +
+        // "the news" becoming "let me checkthe news"). Tool-use and tool-result
+        // blocks are silently skipped — they're not spoken.
+        var indexOfMostRecentTextContentBlock: Int? = nil
 
         for try await line in byteStream.lines {
             // SSE lines look like: "data: {...}"
@@ -203,6 +224,20 @@ class ClaudeAPI {
                let deltaType = delta["type"] as? String,
                deltaType == "text_delta",
                let textChunk = delta["text"] as? String {
+                let currentContentBlockIndex = eventPayload["index"] as? Int
+                let isCrossingIntoNewTextBlock: Bool = {
+                    guard let currentContentBlockIndex = currentContentBlockIndex,
+                          let indexOfMostRecentTextContentBlock = indexOfMostRecentTextContentBlock else {
+                        return false
+                    }
+                    return currentContentBlockIndex != indexOfMostRecentTextContentBlock
+                }()
+                if isCrossingIntoNewTextBlock,
+                   let lastCharacter = accumulatedResponseText.last,
+                   !lastCharacter.isWhitespace {
+                    accumulatedResponseText += " "
+                }
+                indexOfMostRecentTextContentBlock = currentContentBlockIndex
                 accumulatedResponseText += textChunk
                 // Send the accumulated text so far to the UI for progressive rendering
                 let currentAccumulatedText = accumulatedResponseText
