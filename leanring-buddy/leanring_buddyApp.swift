@@ -28,8 +28,8 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
     let conversationStore = ConversationStore()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        print("🎯 Vibecademy: Starting...")
-        print("🎯 Vibecademy: Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")")
+        print("🎯 Sparkle: Starting...")
+        print("🎯 Sparkle: Version \(Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown")")
 
         UserDefaults.standard.register(defaults: ["NSInitialToolTipDelay": 0])
 
@@ -101,7 +101,7 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
             backing: .buffered,
             defer: false
         )
-        window.title = "Vibecademy"
+        window.title = "Sparkle"
         window.minSize = NSSize(width: 800, height: 550)
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -135,9 +135,9 @@ final class CompanionAppDelegate: NSObject, NSApplicationDelegate {
         if loginItemService.status != .enabled {
             do {
                 try loginItemService.register()
-                print("🎯 Vibecademy: Registered as login item")
+                print("🎯 Sparkle: Registered as login item")
             } catch {
-                print("⚠️ Vibecademy: Failed to register as login item: \(error)")
+                print("⚠️ Sparkle: Failed to register as login item: \(error)")
             }
         }
     }

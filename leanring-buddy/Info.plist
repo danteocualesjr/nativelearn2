@@ -11,10 +11,10 @@
 	<key>VoiceTranscriptionProvider</key>
 	<string>assemblyai</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Vibecademy uses your microphone so you can talk to Sparkle, your AI tutor</string>
+	<string>Sparkle uses your microphone so you can talk to your AI tutor</string>
 	<key>NSScreenCaptureUsageDescription</key>
-	<string>Vibecademy needs screen recording access to see your screen and teach you.</string>
+	<string>Sparkle needs screen recording access to see your screen and teach you.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>Vibecademy uses speech recognition to transcribe your voice when you talk to Sparkle</string>
+	<string>Sparkle uses speech recognition to transcribe your voice when you talk to your AI tutor</string>
 </dict>
 </plist>

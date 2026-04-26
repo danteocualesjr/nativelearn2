@@ -68,14 +68,14 @@ final class MenuBarPanelManager: NSObject {
 
         guard let button = statusItem?.button else { return }
 
-        button.image = makeVibecademyMenuBarIcon()
+        button.image = makeSparkleMenuBarIcon()
         button.image?.isTemplate = true
         button.action = #selector(statusItemClicked)
         button.target = self
     }
 
     /// Draws a four-pointed sparkle star as the menu bar icon.
-    private func makeVibecademyMenuBarIcon() -> NSImage {
+    private func makeSparkleMenuBarIcon() -> NSImage {
         let iconSize: CGFloat = 18
         let image = NSImage(size: NSSize(width: iconSize, height: iconSize))
         image.lockFocus()

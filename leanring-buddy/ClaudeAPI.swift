@@ -9,10 +9,49 @@ import Foundation
 class ClaudeAPI {
     private static let tlsWarmupLock = NSLock()
     private static var hasStartedTLSWarmup = false
+    private static let agentDebugLogPath = "/Users/dantecualesjr/Documents/Projects/Projects_2026/nativelearn2/.cursor/debug-60fa08.log"
 
     private let apiURL: URL
     var model: String
     private let session: URLSession
+
+    private static func writeAgentDebugLog(
+        location: String,
+        message: String,
+        hypothesisId: String,
+        data: [String: Any]
+    ) {
+        let payload: [String: Any] = [
+            "sessionId": "60fa08",
+            "runId": "pre-fix-web-search-review",
+            "hypothesisId": hypothesisId,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
+        ]
+
+        guard JSONSerialization.isValidJSONObject(payload),
+              let encodedPayload = try? JSONSerialization.data(withJSONObject: payload),
+              let newline = "\n".data(using: .utf8) else {
+            return
+        }
+
+        let logURL = URL(fileURLWithPath: Self.agentDebugLogPath)
+        FileManager.default.createFile(atPath: Self.agentDebugLogPath, contents: nil)
+
+        guard let fileHandle = try? FileHandle(forWritingTo: logURL) else {
+            return
+        }
+
+        defer {
+            try? fileHandle.close()
+        }
+
+        try? fileHandle.seekToEnd()
+        try? fileHandle.write(contentsOf: encodedPayload)
+        try? fileHandle.write(contentsOf: newline)
+    }
 
     init(proxyURL: String, model: String = "claude-sonnet-4-6") {
         guard let parsedURL = URL(string: proxyURL) else {
@@ -167,6 +206,35 @@ class ClaudeAPI {
         request.httpBody = bodyData
         let payloadMB = Double(bodyData.count) / 1_048_576.0
         print("🌐 Claude streaming request: \(String(format: "%.1f", payloadMB))MB, \(images.count) image(s)")
+        let lowercaseUserPrompt = userPrompt.lowercased()
+        let promptHasCurrentInformationSignal = [
+            "latest",
+            "news",
+            "current",
+            "today",
+            "this week",
+            "recent",
+            "look up",
+            "search",
+            "weather"
+        ].contains { lowercaseUserPrompt.contains($0) }
+        // #region agent log
+        Self.writeAgentDebugLog(
+            location: "ClaudeAPI.swift:170",
+            message: "claude streaming request prepared",
+            hypothesisId: "H1,H2",
+            data: [
+                "model": model,
+                "imageCount": images.count,
+                "conversationHistoryCount": conversationHistory.count,
+                "payloadMegabytes": payloadMB,
+                "hasWebSearchTool": true,
+                "webSearchMaxUses": 3,
+                "maxTokens": 2048,
+                "promptHasCurrentInformationSignal": promptHasCurrentInformationSignal
+            ]
+        )
+        // #endregion
 
         // Use bytes streaming for SSE (Server-Sent Events)
         let (byteStream, response) = try await session.bytes(for: request)
@@ -178,6 +246,17 @@ class ClaudeAPI {
                 userInfo: [NSLocalizedDescriptionKey: "Invalid HTTP response"]
             )
         }
+        // #region agent log
+        Self.writeAgentDebugLog(
+            location: "ClaudeAPI.swift:199",
+            message: "claude streaming http response received",
+            hypothesisId: "H1",
+            data: [
+                "statusCode": httpResponse.statusCode,
+                "contentType": httpResponse.value(forHTTPHeaderField: "content-type") ?? "missing"
+            ]
+        )
+        // #endregion
 
         // If non-2xx status, read the full body as error text
         guard (200...299).contains(httpResponse.statusCode) else {
@@ -186,6 +265,21 @@ class ClaudeAPI {
                 errorBodyChunks.append(line)
             }
             let errorBody = errorBodyChunks.joined(separator: "\n")
+            // #region agent log
+            Self.writeAgentDebugLog(
+                location: "ClaudeAPI.swift:218",
+                message: "claude streaming request failed",
+                hypothesisId: "H1",
+                data: [
+                    "statusCode": httpResponse.statusCode,
+                    "errorBodyLength": errorBody.count,
+                    "errorBodyContainsWebSearch": errorBody.localizedCaseInsensitiveContains("web_search"),
+                    "errorBodyContainsTool": errorBody.localizedCaseInsensitiveContains("tool"),
+                    "errorBodyContainsBeta": errorBody.localizedCaseInsensitiveContains("beta"),
+                    "errorBodyContainsModel": errorBody.localizedCaseInsensitiveContains("model")
+                ]
+            )
+            // #endregion
             throw NSError(
                 domain: "ClaudeAPI",
                 code: httpResponse.statusCode,
@@ -203,6 +297,15 @@ class ClaudeAPI {
         // "the news" becoming "let me checkthe news"). Tool-use and tool-result
         // blocks are silently skipped — they're not spoken.
         var indexOfMostRecentTextContentBlock: Int? = nil
+        var eventTypeCounts: [String: Int] = [:]
+        var contentBlockTypeCounts: [String: Int] = [:]
+        var textDeltaCount = 0
+        var inputJSONDeltaCount = 0
+        var inputJSONDeltaCharacterCount = 0
+        var insertedTextBlockSeparatorCount = 0
+        var observedTextContentBlockIndices: [Int] = []
+        var didSeeWebSearchServerToolUse = false
+        var didSeeWebSearchToolResult = false
 
         for try await line in byteStream.lines {
             // SSE lines look like: "data: {...}"
@@ -217,6 +320,29 @@ class ClaudeAPI {
                   let eventType = eventPayload["type"] as? String else {
                 continue
             }
+            eventTypeCounts[eventType, default: 0] += 1
+
+            if eventType == "content_block_start",
+               let contentBlock = eventPayload["content_block"] as? [String: Any],
+               let contentBlockType = contentBlock["type"] as? String {
+                contentBlockTypeCounts[contentBlockType, default: 0] += 1
+                if contentBlockType == "server_tool_use",
+                   let toolName = contentBlock["name"] as? String,
+                   toolName == "web_search" {
+                    didSeeWebSearchServerToolUse = true
+                }
+                if contentBlockType == "web_search_tool_result" {
+                    didSeeWebSearchToolResult = true
+                }
+            }
+
+            if eventType == "content_block_delta",
+               let delta = eventPayload["delta"] as? [String: Any],
+               let deltaType = delta["type"] as? String,
+               deltaType == "input_json_delta" {
+                inputJSONDeltaCount += 1
+                inputJSONDeltaCharacterCount += (delta["partial_json"] as? String)?.count ?? 0
+            }
 
             // We care about content_block_delta events that contain text chunks
             if eventType == "content_block_delta",
@@ -224,7 +350,12 @@ class ClaudeAPI {
                let deltaType = delta["type"] as? String,
                deltaType == "text_delta",
                let textChunk = delta["text"] as? String {
+                textDeltaCount += 1
                 let currentContentBlockIndex = eventPayload["index"] as? Int
+                if let currentContentBlockIndex = currentContentBlockIndex,
+                   !observedTextContentBlockIndices.contains(currentContentBlockIndex) {
+                    observedTextContentBlockIndices.append(currentContentBlockIndex)
+                }
                 let isCrossingIntoNewTextBlock: Bool = {
                     guard let currentContentBlockIndex = currentContentBlockIndex,
                           let indexOfMostRecentTextContentBlock = indexOfMostRecentTextContentBlock else {
@@ -235,6 +366,7 @@ class ClaudeAPI {
                 if isCrossingIntoNewTextBlock,
                    let lastCharacter = accumulatedResponseText.last,
                    !lastCharacter.isWhitespace {
+                    insertedTextBlockSeparatorCount += 1
                     accumulatedResponseText += " "
                 }
                 indexOfMostRecentTextContentBlock = currentContentBlockIndex
@@ -244,6 +376,26 @@ class ClaudeAPI {
                 await onTextChunk(currentAccumulatedText)
             }
         }
+
+        // #region agent log
+        Self.writeAgentDebugLog(
+            location: "ClaudeAPI.swift:308",
+            message: "claude streaming sse summary",
+            hypothesisId: "H2,H3",
+            data: [
+                "eventTypeCounts": eventTypeCounts,
+                "contentBlockTypeCounts": contentBlockTypeCounts,
+                "textDeltaCount": textDeltaCount,
+                "inputJSONDeltaCount": inputJSONDeltaCount,
+                "inputJSONDeltaCharacterCount": inputJSONDeltaCharacterCount,
+                "insertedTextBlockSeparatorCount": insertedTextBlockSeparatorCount,
+                "observedTextContentBlockIndices": observedTextContentBlockIndices,
+                "didSeeWebSearchServerToolUse": didSeeWebSearchServerToolUse,
+                "didSeeWebSearchToolResult": didSeeWebSearchToolResult,
+                "accumulatedResponseTextLength": accumulatedResponseText.count
+            ]
+        )
+        // #endregion
 
         let duration = Date().timeIntervalSince(startTime)
         return (text: accumulatedResponseText, duration: duration)

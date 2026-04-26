@@ -421,7 +421,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Sparkle;
 				INFOPLIST_KEY_CFBundleName = Sparkle;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Vibecademy needs screen recording access to see your screen and teach you.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Sparkle needs screen recording access to see your screen and teach you.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",
@@ -462,7 +462,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = Sparkle;
 				INFOPLIST_KEY_CFBundleName = Sparkle;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
-				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Vibecademy needs screen recording access to see your screen and teach you.";
+				INFOPLIST_KEY_NSScreenCaptureUsageDescription = "Sparkle needs screen recording access to see your screen and teach you.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/../Frameworks",

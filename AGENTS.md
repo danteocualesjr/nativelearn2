@@ -1,11 +1,11 @@
-# Vibecademy - Agent Instructions
+# Sparkle - Agent Instructions
 
 <!-- This is the single source of truth for all AI coding agents. CLAUDE.md is a symlink to this file. -->
 <!-- AGENTS.md spec: https://github.com/agentsmd/agents.md — supported by Claude Code, Cursor, Copilot, Gemini CLI, and others. -->
 
 ## Overview
 
-Vibecademy is a macOS AI tutor that helps users become AI-native. It places a companion cursor called **Sparkle** (an orange sparkle shape) next to the user's mouse pointer. Sparkle can see the user's screen, respond to voice commands, and walk them through how to use AI tools like Replit, Cursor, Claude Code, and Codex — step by step, conversationally.
+Sparkle is a macOS AI tutor that helps users become AI-native. It places a companion cursor (an orange sparkle shape) next to the user's mouse pointer. Sparkle can see the user's screen, respond to voice commands, and walk them through how to use AI tools like Replit, Cursor, Claude Code, and Codex — step by step, conversationally.
 
 The app has two main surfaces:
 1. **Desktop window** — A full-size window with sidebar navigation, conversation history, and a Sparkle on/off toggle. This is what the user sees on launch.
@@ -19,7 +19,7 @@ All API keys live on a Cloudflare Worker proxy — nothing sensitive ships in th
 
 Key product decisions that shape the current implementation:
 
-- Brand is "Vibecademy" with AI tutor persona "Sparkle"
+- Brand is "Sparkle" with AI tutor persona "Sparkle"
 - Companion icon is an orange sparkle (not a geometric shape)
 - Full desktop app with main window (`LSUIElement=false`), plus a menu bar status item as a secondary surface
 - Persistent conversation storage (JSON files in Application Support)

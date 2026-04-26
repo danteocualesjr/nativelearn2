@@ -2252,7 +2252,7 @@ struct MainWindowView: View {
                 VStack(alignment: .leading, spacing: 10) {
                     HStack(spacing: 8) {
                         GlassSparkleView(baseColor: themePrimary, size: 14)
-                        Text("Setup Vibecademy")
+                        Text("Setup Sparkle")
                             .font(.system(size: 15, weight: .semibold))
                             .foregroundColor(themeOnSurface)
                     }
@@ -3108,7 +3108,7 @@ private struct ProfileDetailView: View {
             shortcutRow(keys: ["⌃", "⌥"], description: "Push-to-talk (hold)", isFirst: true)
             shortcutRow(keys: ["⌘", "K"], description: "Search sessions")
             shortcutRow(keys: ["⌘", ","], description: "Open Settings")
-            shortcutRow(keys: ["⌘", "Q"], description: "Quit Vibecademy", isLast: true)
+            shortcutRow(keys: ["⌘", "Q"], description: "Quit Sparkle", isLast: true)
         }
         .overlay(
             RoundedRectangle(cornerRadius: 12, style: .continuous)
