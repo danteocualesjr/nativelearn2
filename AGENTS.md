@@ -36,7 +36,7 @@ Key product decisions that shape the current implementation:
 - **App Type**: Desktop app with main window + menu bar status item (`LSUIElement=false` in Info.plist)
 - **Framework**: SwiftUI (macOS native) with AppKit bridging for menu bar panel and cursor overlay
 - **Pattern**: MVVM with `@StateObject` / `@ObservedObject` / `@Published` state management
-- **AI Chat**: Claude (Sonnet 4.6 default, Opus 4.6 optional) via Cloudflare Worker proxy with SSE streaming. The streaming request advertises Anthropic's hosted `web_search_20250305` server tool (capped at 3 searches per turn) so Sparkle can answer questions about current events. The system prompt gates when she actually searches — only for time-sensitive or post-training-cutoff questions.
+- **AI Chat**: Claude (Sonnet 4.6 default, Opus 4.6 optional) via Cloudflare Worker proxy with SSE streaming. The streaming request advertises Anthropic's hosted `web_search_20250305` server tool (capped at 3 searches per turn) so Sparkle can answer questions about current events. The system prompt gates when she actually searches — only for time-sensitive or post-training-cutoff questions. The Worker strips the web-search tool from non-current prompts and enforces a KV-backed daily limit for web-search-enabled requests.
 - **Speech-to-Text**: AssemblyAI real-time streaming (`u3-rt-pro` model) via websocket, with OpenAI and Apple Speech as fallbacks
 - **Text-to-Speech**: ElevenLabs (`eleven_flash_v2_5` model, female "Charlotte" voice) via Cloudflare Worker proxy
 - **Screen Capture**: ScreenCaptureKit (macOS 14.2+), multi-monitor support
@@ -58,7 +58,8 @@ The app never calls external APIs directly. All requests go through a Cloudflare
 | `POST /transcribe-token` | `streaming.assemblyai.com/v3/token` | Fetches a short-lived (480s) AssemblyAI websocket token |
 
 Worker secrets: `ANTHROPIC_API_KEY`, `ASSEMBLYAI_API_KEY`, `ELEVENLABS_API_KEY`
-Worker vars: `ELEVENLABS_VOICE_ID` (set to `XB0fDUnXU5powFXDhCwa` — Charlotte female voice)
+Worker vars: `ELEVENLABS_VOICE_ID` (set to `XB0fDUnXU5powFXDhCwa` — Charlotte female voice), `WEB_SEARCH_DAILY_LIMIT` (defaults to 20 per client per UTC day)
+Worker KV bindings: `WEB_SEARCH_RATE_LIMIT_KV` stores hashed per-client daily counters for web-search-enabled requests.
 
 ### Key Architecture Decisions
 
@@ -105,7 +106,7 @@ Worker vars: `ELEVENLABS_VOICE_ID` (set to `XB0fDUnXU5powFXDhCwa` — Charlotte 
 | `VibecademyAnalytics.swift` | ~122 | PostHog analytics integration (`VibecademyAnalytics`) for usage tracking. |
 | `WindowPositionManager.swift` | ~262 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
 | `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader for keys stored in the app bundle Info.plist. |
-| `worker/src/index.ts` | ~142 | Cloudflare Worker proxy. Three routes: `/chat` (Claude), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). |
+| `worker/src/index.ts` | ~290 | Cloudflare Worker proxy. Three routes: `/chat` (Claude), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). The `/chat` route strips web search from non-current prompts and applies KV-backed per-client daily rate limiting before forwarding web-search-enabled requests to Anthropic. |
 
 ## Build & Run
 
@@ -133,6 +134,10 @@ npm install
 npx wrangler secret put ANTHROPIC_API_KEY
 npx wrangler secret put ASSEMBLYAI_API_KEY
 npx wrangler secret put ELEVENLABS_API_KEY
+
+# Add web search rate-limit storage and copy the generated IDs into wrangler.toml
+npx wrangler kv:namespace create WEB_SEARCH_RATE_LIMIT_KV
+npx wrangler kv:namespace create WEB_SEARCH_RATE_LIMIT_KV --preview
 
 # Deploy
 npx wrangler deploy

@@ -4,3 +4,9 @@ compatibility_date = "2024-01-01"
 
 [vars]
 ELEVENLABS_VOICE_ID = "XB0fDUnXU5powFXDhCwa"
+WEB_SEARCH_DAILY_LIMIT = "20"
+
+[[kv_namespaces]]
+binding = "WEB_SEARCH_RATE_LIMIT_KV"
+id = "ec3fb13d915c42da8c7b379ab4459001"
+preview_id = "d8240c5245a3442da4325cfb999625b8"

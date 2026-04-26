@@ -37,6 +37,14 @@ npx wrangler secret put ASSEMBLYAI_API_KEY
 npx wrangler secret put ELEVENLABS_API_KEY
 ```
 
+Create a KV namespace for web search rate limiting:
+```bash
+npx wrangler kv:namespace create WEB_SEARCH_RATE_LIMIT_KV
+npx wrangler kv:namespace create WEB_SEARCH_RATE_LIMIT_KV --preview
+```
+
+Copy the generated IDs into `worker/wrangler.toml` and uncomment the `[[kv_namespaces]]` binding. `WEB_SEARCH_DAILY_LIMIT` defaults to `20` web-search-enabled requests per client per UTC day.
+
 Update the voice ID in `wrangler.toml` if desired, then deploy:
 ```bash
 npx wrangler deploy
