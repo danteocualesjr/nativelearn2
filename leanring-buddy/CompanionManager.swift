@@ -23,46 +23,6 @@ enum CompanionVoiceState {
 
 @MainActor
 final class CompanionManager: ObservableObject {
-    private static let agentDebugLogPath = "/Users/dantecualesjr/Documents/Projects/Projects_2026/nativelearn2/.cursor/debug-60fa08.log"
-
-    private static func writeAgentDebugLog(
-        location: String,
-        message: String,
-        hypothesisId: String,
-        data: [String: Any]
-    ) {
-        let payload: [String: Any] = [
-            "sessionId": "60fa08",
-            "runId": "pre-fix-web-search-review",
-            "hypothesisId": hypothesisId,
-            "location": location,
-            "message": message,
-            "data": data,
-            "timestamp": Int(Date().timeIntervalSince1970 * 1000)
-        ]
-
-        guard JSONSerialization.isValidJSONObject(payload),
-              let encodedPayload = try? JSONSerialization.data(withJSONObject: payload),
-              let newline = "\n".data(using: .utf8) else {
-            return
-        }
-
-        let logURL = URL(fileURLWithPath: Self.agentDebugLogPath)
-        FileManager.default.createFile(atPath: Self.agentDebugLogPath, contents: nil)
-
-        guard let fileHandle = try? FileHandle(forWritingTo: logURL) else {
-            return
-        }
-
-        defer {
-            try? fileHandle.close()
-        }
-
-        try? fileHandle.seekToEnd()
-        try? fileHandle.write(contentsOf: encodedPayload)
-        try? fileHandle.write(contentsOf: newline)
-    }
-
     @Published private(set) var voiceState: CompanionVoiceState = .idle
     @Published private(set) var lastTranscript: String?
     @Published private(set) var currentAudioPowerLevel: CGFloat = 0
@@ -729,22 +689,6 @@ final class CompanionManager: ObservableObject {
 
                 guard !Task.isCancelled else { return }
 
-                // #region agent log
-                Self.writeAgentDebugLog(
-                    location: "CompanionManager.swift:728",
-                    message: "claude full response received before parsing",
-                    hypothesisId: "H4,H5",
-                    data: [
-                        "fullResponseTextLength": fullResponseText.count,
-                        "containsPointTag": fullResponseText.contains("[POINT:"),
-                        "containsPointNone": fullResponseText.contains("[POINT:none]"),
-                        "containsURL": fullResponseText.localizedCaseInsensitiveContains("http://") || fullResponseText.localizedCaseInsensitiveContains("https://"),
-                        "containsLikelyMarkdownCitation": fullResponseText.range(of: #"(?<!\[POINT:)\[\d+\]"#, options: .regularExpression) != nil,
-                        "containsMarkdownLink": fullResponseText.range(of: #"\[[^\]]+\]\([^)]+\)"#, options: .regularExpression) != nil
-                    ]
-                )
-                // #endregion
-
                 let segments = Self.parseResponseIntoSegments(from: fullResponseText)
                 let pointSegmentCount = segments.filter({ $0.pointCoordinate != nil }).count
                 let hasMultiplePointSegments = pointSegmentCount > 1
@@ -752,22 +696,6 @@ final class CompanionManager: ObservableObject {
 
                 let fullSpokenText = segments.map { $0.spokenText }.joined(separator: " ")
                     .trimmingCharacters(in: .whitespacesAndNewlines)
-                // #region agent log
-                Self.writeAgentDebugLog(
-                    location: "CompanionManager.swift:750",
-                    message: "response parsed into spoken segments",
-                    hypothesisId: "H5",
-                    data: [
-                        "segmentCount": segments.count,
-                        "pointSegmentCount": pointSegmentCount,
-                        "hasMultiplePointSegments": hasMultiplePointSegments,
-                        "fullSpokenTextLength": fullSpokenText.count,
-                        "spokenTextContainsPointTag": fullSpokenText.contains("[POINT:"),
-                        "spokenTextContainsURL": fullSpokenText.localizedCaseInsensitiveContains("http://") || fullSpokenText.localizedCaseInsensitiveContains("https://"),
-                        "spokenTextContainsLikelyMarkdownCitation": fullSpokenText.range(of: #"(?<!\[POINT:)\[\d+\]"#, options: .regularExpression) != nil
-                    ]
-                )
-                // #endregion
 
                 if hasMultiplePointSegments {
                     try await playMultiPointResponse(
