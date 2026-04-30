@@ -93,10 +93,6 @@ final class CompanionManager: ObservableObject {
         return ElevenLabsTTSClient(proxyURL: "\(Self.workerBaseURL)/tts")
     }()
 
-    /// Conversation history so Claude remembers prior exchanges within a session.
-    /// Each entry is the user's transcript and Claude's response.
-    private var conversationHistory: [(userTranscript: String, assistantResponse: String)] = []
-
     /// The currently running AI response task, if any. Cancelled when the user
     /// speaks again so a new response can begin immediately.
     private var currentResponseTask: Task<Void, Never>?
@@ -667,8 +663,13 @@ final class CompanionManager: ObservableObject {
                     return (data: capture.imageData, label: capture.label + dimensionInfo)
                 }
 
-                let historyForAPI = conversationHistory.map { entry in
-                    (userPlaceholder: entry.userTranscript, assistantResponse: entry.assistantResponse)
+                // Single source of truth: derive prior exchanges from the persisted
+                // active conversation. Capped to the last 10 to stay within the
+                // existing token budget the API request was tuned for.
+                let priorExchanges = (conversationStore?.activeConversation?.exchanges ?? [])
+                    .suffix(10)
+                let historyForAPI = priorExchanges.map { exchange in
+                    (userPlaceholder: exchange.userTranscript, assistantResponse: exchange.assistantResponse)
                 }
 
                 let activeLessonContext = conversationStore?.activeConversation?.lessonContext
@@ -711,21 +712,13 @@ final class CompanionManager: ObservableObject {
 
                 guard !Task.isCancelled else { return }
 
-                conversationHistory.append((
-                    userTranscript: transcript,
-                    assistantResponse: fullSpokenText
-                ))
-
-                if conversationHistory.count > 10 {
-                    conversationHistory.removeFirst(conversationHistory.count - 10)
-                }
-
                 conversationStore?.appendExchange(
                     userTranscript: transcript,
                     assistantResponse: fullSpokenText
                 )
 
-                print("🧠 Conversation history: \(conversationHistory.count) exchanges")
+                let totalExchangesAfterAppend = conversationStore?.activeConversation?.exchanges.count ?? 0
+                print("🧠 Conversation history: \(totalExchangesAfterAppend) exchanges")
                 VibecademyAnalytics.trackAIResponseReceived(response: fullSpokenText)
 
             } catch is CancellationError {

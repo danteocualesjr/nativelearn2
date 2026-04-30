@@ -587,6 +587,7 @@ struct MainWindowView: View {
             ConversationDetailView(
                 conversation: conversation,
                 conversationStore: conversationStore,
+                companionManager: companionManager,
                 onBack: { selectedConversationId = nil }
             )
         } else if sidebarSelection == .profile {
@@ -3317,10 +3318,18 @@ private struct ProfileDetailView: View {
 
 struct ConversationDetailView: View {
     let conversation: Conversation
-    let conversationStore: ConversationStore
+    @ObservedObject var conversationStore: ConversationStore
+    @ObservedObject var companionManager: CompanionManager
     let onBack: () -> Void
 
     @State private var showTranscript = false
+
+    /// Whether this conversation is the one push-to-talk will append to.
+    /// Drives the "Continue this conversation" / "Active session" affordance
+    /// in the header. Re-evaluated whenever the store publishes a change.
+    private var isActiveConversation: Bool {
+        conversationStore.activeConversationId == conversation.id
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -3346,6 +3355,8 @@ struct ConversationDetailView: View {
                 }
 
                 Spacer()
+
+                continueOrActiveSessionControl
 
                 Picker("", selection: $showTranscript) {
                     Text("Summary").tag(false)
@@ -3407,6 +3418,64 @@ struct ConversationDetailView: View {
             }
         }
         .background(themeSurface)
+    }
+
+    /// Header slot that lets the user resume this conversation. When this
+    /// conversation is already the one push-to-talk will append to, the slot
+    /// shows a passive "Active session" pill instead so the user knows
+    /// pressing Control+Option will continue this thread.
+    @ViewBuilder
+    private var continueOrActiveSessionControl: some View {
+        if isActiveConversation {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(Color.green.opacity(0.8))
+                    .frame(width: 6, height: 6)
+                Text("Active session")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(themeOnSurfaceVariant)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(themeSurfaceContainerLowest)
+            )
+            .help("Push-to-talk will continue this conversation")
+        } else {
+            Button(action: { resumeThisConversation() }) {
+                HStack(spacing: 5) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 10, weight: .semibold))
+                    Text("Continue this conversation")
+                        .font(.system(size: 12, weight: .semibold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 6, style: .continuous)
+                        .fill(themePrimary)
+                )
+            }
+            .buttonStyle(.plain)
+            .onHover { hovering in
+                if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+            }
+            .help("Make this the active conversation so push-to-talk continues this thread")
+        }
+    }
+
+    /// Sets this conversation as the active one so the next push-to-talk
+    /// appends to it (and Sparkle's prior-history payload reflects it),
+    /// turns Sparkle on if the user had it disabled, and dismisses the
+    /// detail view so the user can immediately use Control+Option.
+    private func resumeThisConversation() {
+        conversationStore.activeConversationId = conversation.id
+        if !companionManager.isSparkleCursorEnabled {
+            companionManager.setSparkleCursorEnabled(true)
+        }
+        onBack()
     }
 
     private func tagBadge(icon: String, text: String) -> some View {
