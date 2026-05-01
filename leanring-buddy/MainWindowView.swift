@@ -10,6 +10,16 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+// MARK: - Notifications
+
+extension Notification.Name {
+    /// Posted by the app's `CommandGroup(replacing: .appSettings)` handler when
+    /// the user presses ⌘, or chooses the Preferences menu item. The main
+    /// window observes this and routes the user to `ProfileDetailView`, which
+    /// is the in-app home for preferences.
+    static let vibecademyOpenPreferences = Notification.Name("vibecademyOpenPreferences")
+}
+
 // MARK: - Theme Colors (Material Design 3 — Sparkle blue/purple light palette)
 
 private let themePrimary = Color(hex: "#0058bc")
@@ -105,12 +115,19 @@ struct MainWindowView: View {
     @State private var inlineRenameText: String = ""
     @FocusState private var isInlineRenameFocused: Bool
 
+    /// Controls focus on the sidebar "Search sessions..." field so we can
+    /// route the ⌘K keyboard shortcut to it.
+    @FocusState private var isSidebarSearchFocused: Bool
+
     /// Identifiable wrapper so we can drive `.sheet(item:)` with just a conversation id.
     private struct EditSheetItem: Identifiable, Equatable {
         let id: UUID
     }
     @AppStorage("sidebarCollapsed") private var isSidebarCollapsed = false
-    @AppStorage("userDisplayName") private var userDisplayName = "Dante"
+    /// Empty by default — we no longer ship a hardcoded developer name. The
+    /// UI falls back to the macOS account full name (or a friendly empty
+    /// state) until the user sets their own in Profile preferences.
+    @AppStorage("userDisplayName") private var userDisplayName = ""
     @AppStorage("profilePhotoPath") private var profilePhotoRelativePath = ""
     @AppStorage("displayDensity") private var displayDensityRaw: String = DisplayDensity.comfortable.rawValue
 
@@ -120,7 +137,6 @@ struct MainWindowView: View {
 
     enum SidebarItem: Hashable {
         case home
-        case chat
         case archive
         case profile
         case space(UUID)
@@ -151,6 +167,49 @@ struct MainWindowView: View {
         .sheet(item: $editSheetItem) { item in
             editSessionSheet(for: item.id)
         }
+        .background(keyboardShortcutHandlers)
+        .onReceive(NotificationCenter.default.publisher(for: .vibecademyOpenPreferences)) { _ in
+            openInAppPreferences()
+        }
+    }
+
+    /// Invisible buttons that own keyboard shortcuts. They are placed in
+    /// `.background` so they take up no layout space but remain in the view
+    /// tree. `keyboardShortcut` on a non-focusable button means the shortcut
+    /// fires without stealing focus from any active text field.
+    private var keyboardShortcutHandlers: some View {
+        VStack(spacing: 0) {
+            Button(action: focusSidebarSearchFromShortcut) {
+                EmptyView()
+            }
+            .keyboardShortcut("k", modifiers: .command)
+            .opacity(0)
+            .frame(width: 0, height: 0)
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// Brings the sidebar back into view (if the user collapsed it) and moves
+    /// keyboard focus to the sidebar's search field. Wired to ⌘K to match the
+    /// "⌘K" keycap badge rendered next to the field.
+    private func focusSidebarSearchFromShortcut() {
+        if isSidebarCollapsed {
+            withAnimation(.easeInOut(duration: 0.2)) { isSidebarCollapsed = false }
+        }
+        // Defer focus by one runloop tick so SwiftUI has a chance to insert
+        // the sidebar (and its TextField) back into the view tree before we
+        // try to focus it.
+        DispatchQueue.main.async {
+            isSidebarSearchFocused = true
+        }
+    }
+
+    /// Routes the user to the in-app preferences home (the Profile detail).
+    /// Triggered both by the ⌘, app-settings command and by the sidebar's
+    /// "Preferences" row.
+    private func openInAppPreferences() {
+        sidebarSelection = .profile
+        selectedConversationId = nil
     }
 
     // MARK: - Sidebar
@@ -210,6 +269,7 @@ struct MainWindowView: View {
                 TextField("Search sessions...", text: $searchText)
                     .textFieldStyle(.plain)
                     .font(.system(size: 12))
+                    .focused($isSidebarSearchFocused)
                 Spacer()
                 HStack(spacing: 2) {
                     monoKeycap("⌘")
@@ -225,10 +285,11 @@ struct MainWindowView: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 24)
 
-            // Nav items
+            // Nav items. There used to be a separate "Chat" row alongside
+            // "Home", but both rendered the same dashboard. The duplicate was
+            // removed; if Chat returns later it should map to a distinct view.
             VStack(spacing: 2) {
                 sidebarNavRow(item: .home, icon: "house", label: "Home")
-                sidebarNavRow(item: .chat, icon: "bubble.left.and.bubble.right", label: "Chat")
                 sidebarArchiveRow
             }
             .padding(.horizontal, 8)
@@ -317,18 +378,19 @@ struct MainWindowView: View {
             }
             .padding(.horizontal, 8)
 
-            // Settings at bottom of nav
+            // Preferences at bottom of nav. Routes to the in-app
+            // ProfileDetailView (which is Sparkle's preferences home), not
+            // to macOS System Settings. Users who actually need the macOS
+            // Privacy & Security pane can reach it from inside Preferences.
             VStack(spacing: 2) {
                 Button {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
-                        NSWorkspace.shared.open(url)
-                    }
+                    openInAppPreferences()
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: "gearshape")
                             .font(.system(size: 14))
                             .foregroundColor(neutralGray500)
-                        Text("Settings")
+                        Text("Preferences")
                             .font(.system(size: 13, weight: .medium))
                             .foregroundColor(neutralGray500)
                         Spacer()
@@ -342,6 +404,7 @@ struct MainWindowView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
+                .nativeTooltip("Open Sparkle preferences (⌘,)")
                 .onHover { hovering in
                     if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
                 }
@@ -385,9 +448,16 @@ struct MainWindowView: View {
                             )
                     }
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(userDisplayName)
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(Color(hex: "#0f172a"))
+                        if effectiveDisplayName.isEmpty {
+                            Text("Add your name")
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(neutralGray500)
+                                .italic()
+                        } else {
+                            Text(effectiveDisplayName)
+                                .font(.system(size: 13, weight: .semibold))
+                                .foregroundColor(Color(hex: "#0f172a"))
+                        }
                         Text("Free Tier")
                             .font(.system(size: 10))
                             .foregroundColor(neutralGray500)
@@ -570,12 +640,37 @@ struct MainWindowView: View {
         return "Off"
     }
 
+    /// Display name to show in the chrome (welcome header, sidebar chip, row
+    /// owner labels). Falls back to the macOS account full name when the user
+    /// hasn't filled in their preferred name yet, and to `""` when even that
+    /// is unavailable so callers can render an empty state.
+    private var effectiveDisplayName: String {
+        let trimmedExplicitName = userDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedExplicitName.isEmpty {
+            return trimmedExplicitName
+        }
+        let systemFullName = NSFullUserName().trimmingCharacters(in: .whitespacesAndNewlines)
+        return systemFullName
+    }
+
+    /// Single character used inside the circular avatar in the sidebar.
+    /// Matches the empty state of `effectiveDisplayName` so we never show a
+    /// stray "?" once a user has any name available from macOS.
     private var userInitialLetterForToolbar: String {
-        let trimmed = userDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        if let first = trimmed.first {
+        if let first = effectiveDisplayName.first {
             return String(first).uppercased()
         }
         return "?"
+    }
+
+    /// Headline greeting on the dashboard. Personalised when we have any
+    /// name to use; otherwise a friendly generic that doesn't expose the
+    /// trailing comma artefact ("Welcome back, ").
+    private var welcomeGreeting: String {
+        if effectiveDisplayName.isEmpty {
+            return "Welcome back"
+        }
+        return "Welcome back, \(effectiveDisplayName)"
     }
 
     // MARK: - Detail Routing
@@ -609,7 +704,7 @@ struct MainWindowView: View {
         let spaceFilter: UUID? = {
             switch sidebarSelection {
             case .space(let id): return id
-            case .home, .chat, .archive, .profile: return nil
+            case .home, .archive, .profile: return nil
             }
         }()
 
@@ -1243,41 +1338,16 @@ struct MainWindowView: View {
             Spacer()
 
             HStack(spacing: 12) {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 12))
-                        .foregroundColor(neutralGray400)
-                    TextField("Search resources...", text: .constant(""))
-                        .textFieldStyle(.plain)
-                        .font(.system(size: 13))
-                        .frame(width: 160)
-                }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(
-                    Capsule()
-                        .fill(themeSurfaceContainerHigh)
-                )
-
-                HStack(spacing: 12) {
-                    Button {
-                        companionManager.setSparkleCursorEnabled(!companionManager.isSparkleCursorEnabled)
-                    } label: {
-                        Image(systemName: "mic")
-                            .font(.system(size: 14))
-                            .foregroundColor(neutralGray500)
-                    }
-                    .buttonStyle(.plain)
-                    .nativeTooltip(companionManager.isSparkleCursorEnabled ? "Sparkle: \(sparkleStatusShortLabel)" : "Toggle Sparkle")
-                    .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
-
-                    Image(systemName: "doc.text")
-                        .font(.system(size: 14))
-                        .foregroundColor(neutralGray500)
-                    Image(systemName: "link")
+                Button {
+                    companionManager.setSparkleCursorEnabled(!companionManager.isSparkleCursorEnabled)
+                } label: {
+                    Image(systemName: "mic")
                         .font(.system(size: 14))
                         .foregroundColor(neutralGray500)
                 }
+                .buttonStyle(.plain)
+                .nativeTooltip(companionManager.isSparkleCursorEnabled ? "Sparkle: \(sparkleStatusShortLabel)" : "Toggle Sparkle")
+                .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
             }
         }
         .padding(.horizontal, 32)
@@ -1289,7 +1359,7 @@ struct MainWindowView: View {
 
     private var welcomeHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Welcome back, \(userDisplayName)")
+            Text(welcomeGreeting)
                 .font(.system(size: 48, weight: .bold))
                 .foregroundColor(themeOnSurface)
                 .tracking(-1.5)
@@ -2062,8 +2132,8 @@ struct MainWindowView: View {
 
     private func previousSessionRow(_ conversation: Conversation) -> some View {
         let isHovered = hoveredPreviousRowId == conversation.id
-        let trimmedName = userDisplayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let ownerLabel = trimmedName.isEmpty ? "Me" : trimmedName
+        let resolvedName = effectiveDisplayName
+        let ownerLabel = resolvedName.isEmpty ? "Me" : resolvedName
 
         let isCompact = density == .compact
         let rowSpacing: CGFloat = isCompact ? 10 : 12
@@ -2168,13 +2238,9 @@ struct MainWindowView: View {
 
     private var focusDock: some View {
         HStack(spacing: 16) {
-            // Left icons
-            HStack(spacing: 12) {
-                dockIconButton("mic")
-                dockIconButton("doc.text")
-            }
-
-            // Main CTA
+            // Main CTA. The flanking icon buttons that used to live here had
+            // empty actions and were removed — we'd rather ship fewer
+            // affordances than ship buttons that do nothing on click.
             Button {
                 conversationStore.endCurrentConversation()
                 let newConversationId = conversationStore.startNewConversation()
@@ -2203,12 +2269,6 @@ struct MainWindowView: View {
             .onHover { hovering in
                 if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
             }
-
-            // Right icons
-            HStack(spacing: 12) {
-                dockIconButton("link")
-                dockIconButton("ellipsis")
-            }
         }
         .padding(.horizontal, 24)
         .padding(.vertical, 12)
@@ -2228,20 +2288,6 @@ struct MainWindowView: View {
         .scaleEffect(isDockHovered ? 1.03 : 1.0)
         .animation(.easeOut(duration: 0.3), value: isDockHovered)
         .onHover { hovering in isDockHovered = hovering }
-    }
-
-    private func dockIconButton(_ iconName: String) -> some View {
-        Button { } label: {
-            Image(systemName: iconName)
-                .font(.system(size: 16))
-                .foregroundColor(neutralGray600)
-                .frame(width: 32, height: 32)
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .onHover { hovering in
-            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
-        }
     }
 
     // MARK: - Hero Card
@@ -2795,6 +2841,16 @@ private struct ProfileDetailView: View {
 
                     Divider().padding(.horizontal, 32).padding(.bottom, 24)
 
+                    // MARK: System Permissions
+
+                    profileSectionHeader("System Permissions")
+
+                    systemPermissionsLink
+                        .padding(.horizontal, 32)
+                        .padding(.bottom, 40)
+
+                    Divider().padding(.horizontal, 32).padding(.bottom, 24)
+
                     // MARK: Keyboard Shortcuts
 
                     profileSectionHeader("Keyboard Shortcuts")
@@ -3102,6 +3158,54 @@ private struct ProfileDetailView: View {
         )
     }
 
+    // MARK: - System Permissions
+
+    /// One-tap link out to macOS System Settings → Privacy & Security so users
+    /// can grant or revoke microphone, accessibility, and screen recording
+    /// access for Sparkle. The sidebar "Preferences" row used to open this
+    /// pane directly; we kept it reachable here for users who actually need it.
+    private var systemPermissionsLink: some View {
+        Button {
+            if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security") {
+                NSWorkspace.shared.open(url)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "lock.shield")
+                    .font(.system(size: 16))
+                    .foregroundColor(themeTertiary)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Open System Privacy & Security")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(themeOnSurface)
+                    Text("Grant or revoke microphone, accessibility, and screen recording access for Sparkle.")
+                        .font(.system(size: 12))
+                        .foregroundColor(themeOnSurfaceVariant)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer()
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(themeOnSurfaceVariant.opacity(0.6))
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 12)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(themeSurfaceContainerHigh)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(themeOutlineVariant.opacity(0.3), lineWidth: 1)
+            )
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+        }
+    }
+
     // MARK: - Keyboard Shortcuts
 
     private var shortcutsReference: some View {
@@ -3306,8 +3410,8 @@ private struct ProfileDetailView: View {
     }
 
     private func resetProfileToDefaults() {
-        userDisplayName = "Dante"
-        draftDisplayName = "Dante"
+        userDisplayName = ""
+        draftDisplayName = ""
         persistedEmail = ""
         draftEmail = ""
         removeProfilePhoto()

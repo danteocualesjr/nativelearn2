@@ -15,7 +15,31 @@ struct leanring_buddyApp: App {
     @NSApplicationDelegateAdaptor(CompanionAppDelegate.self) var appDelegate
 
     var body: some Scene {
+        // The main window is created programmatically via NSWindow in the
+        // app delegate, so this Settings scene is the only SwiftUI Scene we
+        // declare. It stays as `EmptyView` because Sparkle's preferences
+        // live in `ProfileDetailView` inside the main window, not in a
+        // separate Settings panel.
+        //
+        // We replace the default `.appSettings` command group so that ⌘, (and
+        // the "Settings…" menu item macOS auto-creates) routes the user into
+        // the in-app Preferences instead of opening an empty Settings window.
         Settings { EmptyView() }
+            .commands {
+                CommandGroup(replacing: .appSettings) {
+                    Button("Preferences…") {
+                        NSApplication.shared.activate(ignoringOtherApps: true)
+                        if let appDelegate = NSApplication.shared.delegate as? CompanionAppDelegate {
+                            appDelegate.showMainWindow()
+                        }
+                        NotificationCenter.default.post(
+                            name: .vibecademyOpenPreferences,
+                            object: nil
+                        )
+                    }
+                    .keyboardShortcut(",", modifiers: .command)
+                }
+            }
     }
 }
 
