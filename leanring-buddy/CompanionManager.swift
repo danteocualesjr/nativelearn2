@@ -741,8 +741,7 @@ final class CompanionManager: ObservableObject {
                 VibecademyAnalytics.trackResponseError(error: error.localizedDescription)
                 print("⚠️ Companion response error: \(error)")
                 isMultiPointSequenceActive = false
-                speakCreditsErrorFallback()
-                showOverlayError("Couldn't reach Sparkle's brain — check your connection")
+                handleResponseChainError(error)
             }
 
             if !Task.isCancelled {
@@ -793,8 +792,7 @@ final class CompanionManager: ObservableObject {
             } catch {
                 VibecademyAnalytics.trackTTSError(error: error.localizedDescription)
                 print("⚠️ ElevenLabs TTS error: \(error)")
-                speakCreditsErrorFallback()
-                showOverlayError("Voice playback failed — using system voice")
+                handleTTSError(error, responseTextForSystemVoiceFallback: fullSpokenText)
             }
         }
     }
@@ -950,10 +948,112 @@ final class CompanionManager: ObservableObject {
     /// credits run out. Uses NSSpeechSynthesizer so it works even when
     /// ElevenLabs is down.
     private func speakCreditsErrorFallback() {
-        let utterance = "Looks like I'm having trouble connecting right now. Please check the API configuration and try again."
+        speakWithSystemVoice("Looks like I'm having trouble connecting right now. Please check the API configuration and try again.")
+    }
+
+    /// Speaks an arbitrary string through macOS system TTS
+    /// (`NSSpeechSynthesizer`) and flips the voice state to `.responding`.
+    /// Used for two distinct scenarios:
+    ///   - generic API failures: a short error utterance so the user
+    ///     gets audible confirmation that something went wrong.
+    ///   - ElevenLabs 429 rate limit: the actual response text, so the
+    ///     user still hears the answer even though the premium voice
+    ///     budget is exhausted for the day.
+    private func speakWithSystemVoice(_ utterance: String) {
+        let trimmedUtterance = utterance.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedUtterance.isEmpty else { return }
         let synthesizer = NSSpeechSynthesizer()
-        synthesizer.startSpeaking(utterance)
+        synthesizer.startSpeaking(trimmedUtterance)
         voiceState = .responding
+    }
+
+    // MARK: - Friendly Proxy Error Handling
+
+    /// Routes a Claude-pipeline error to a friendlier overlay + spoken
+    /// message when the Worker proxy returned a known state (429 daily
+    /// rate limit, 401 rejected credentials). Anything else falls back
+    /// to the original generic "couldn't reach Sparkle's brain" copy.
+    private func handleResponseChainError(_ error: Error) {
+        if let proxyError = error as? SparkleProxyError {
+            if proxyError.isRateLimited {
+                VibecademyAnalytics.trackProxyRateLimited(
+                    endpoint: proxyError.endpoint.rawValue,
+                    retryAfterSeconds: proxyError.retryAfterSeconds
+                )
+                // Skip the misleading "trouble connecting / check API
+                // configuration" credits-error utterance — on a 429
+                // there's nothing for the user to fix client-side.
+                speakWithSystemVoice("That's all the questions I can answer today. Let's pick this back up tomorrow.")
+                showOverlayError(
+                    rateLimitedOverlayMessage(
+                        for: proxyError.endpoint,
+                        retryAfterSeconds: proxyError.retryAfterSeconds
+                    )
+                )
+                return
+            }
+            if proxyError.isCredentialsRejected {
+                // No spoken fallback here — restarting the app is a
+                // visual instruction, and a system-voice utterance
+                // would just add noise on top of an actionable error.
+                showOverlayError("Sparkle credentials rejected — try restarting the app")
+                return
+            }
+        }
+        speakCreditsErrorFallback()
+        showOverlayError("Couldn't reach Sparkle's brain — check your connection")
+    }
+
+    /// Routes an ElevenLabs TTS error to a friendlier overlay + spoken
+    /// message. On a 429 we degrade to system voice and *speak the
+    /// actual answer* so the user still gets the response — the chat
+    /// pipeline already returned successfully, only the premium voice
+    /// is unavailable.
+    private func handleTTSError(
+        _ error: Error,
+        responseTextForSystemVoiceFallback: String
+    ) {
+        if let proxyError = error as? SparkleProxyError, proxyError.isRateLimited {
+            VibecademyAnalytics.trackProxyRateLimited(
+                endpoint: proxyError.endpoint.rawValue,
+                retryAfterSeconds: proxyError.retryAfterSeconds
+            )
+            speakWithSystemVoice(responseTextForSystemVoiceFallback)
+            showOverlayError("Voice quota reached — using system voice")
+            return
+        }
+        if let proxyError = error as? SparkleProxyError, proxyError.isCredentialsRejected {
+            showOverlayError("Sparkle credentials rejected — try restarting the app")
+            return
+        }
+        speakCreditsErrorFallback()
+        showOverlayError("Voice playback failed — using system voice")
+    }
+
+    /// Builds the per-endpoint overlay copy for a 429. We prefer a
+    /// concise "back tomorrow" message, but if the daily counter rolls
+    /// over within an hour we surface the approximate wait time so a
+    /// user near the boundary doesn't think they're locked out for a
+    /// full day.
+    private func rateLimitedOverlayMessage(
+        for endpoint: SparkleProxyError.Endpoint,
+        retryAfterSeconds: Int?
+    ) -> String {
+        let endpointLabel: String
+        switch endpoint {
+        case .chat:
+            endpointLabel = "Daily Sparkle limit hit"
+        case .tts:
+            endpointLabel = "Daily voice limit hit"
+        case .transcribe:
+            endpointLabel = "Daily voice-input limit hit"
+        }
+
+        if let retryAfterSeconds, retryAfterSeconds > 0, retryAfterSeconds < 3600 {
+            let waitMinutes = max(1, Int((Double(retryAfterSeconds) / 60.0).rounded()))
+            return "\(endpointLabel) — try again in ~\(waitMinutes)m"
+        }
+        return "\(endpointLabel) — back tomorrow"
     }
 
     /// Shows a brief error message in the overlay and sidebar, then auto-clears

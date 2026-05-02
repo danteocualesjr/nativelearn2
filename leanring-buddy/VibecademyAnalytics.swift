@@ -119,4 +119,22 @@ enum VibecademyAnalytics {
             "error": error
         ])
     }
+
+    /// The Sparkle Worker proxy returned HTTP 429 because this install
+    /// exhausted its per-day quota for an endpoint. Lets us see, in
+    /// PostHog, whether real users are bumping into the caps so we know
+    /// when to raise them.
+    ///
+    /// `endpoint` matches `SparkleProxyError.Endpoint.rawValue` —
+    /// `"chat"`, `"tts"`, or `"transcribe"`. `retryAfterSeconds` is
+    /// the seconds-until-UTC-midnight value the Worker returned.
+    static func trackProxyRateLimited(endpoint: String, retryAfterSeconds: Int?) {
+        var properties: [String: Any] = [
+            "endpoint": endpoint
+        ]
+        if let retryAfterSeconds {
+            properties["retry_after_seconds"] = retryAfterSeconds
+        }
+        PostHogSDK.shared.capture("proxy_rate_limited", properties: properties)
+    }
 }

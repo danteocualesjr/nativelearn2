@@ -70,12 +70,21 @@ final class AssemblyAIStreamingTranscriptionProvider: BuddyTranscriptionProvider
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
-        guard let httpResponse = response as? HTTPURLResponse,
-              (200...299).contains(httpResponse.statusCode) else {
-            let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
-            let body = String(data: data, encoding: .utf8) ?? "unknown"
+        guard let httpResponse = response as? HTTPURLResponse else {
             throw AssemblyAIStreamingTranscriptionProviderError(
-                message: "Failed to fetch AssemblyAI token (HTTP \(statusCode)): \(body)"
+                message: "Failed to fetch AssemblyAI token: invalid HTTP response."
+            )
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            // Wrap non-2xx in SparkleProxyError so the dictation
+            // pipeline surfaces a friendly "Daily voice-input limit
+            // reached" message on 429 (via LocalizedError.errorDescription)
+            // instead of the raw HTTP body.
+            throw SparkleProxyError.fromHTTPResponse(
+                endpoint: .transcribe,
+                statusCode: httpResponse.statusCode,
+                responseBody: data
             )
         }
 

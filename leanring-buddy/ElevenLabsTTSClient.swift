@@ -64,9 +64,15 @@ final class ElevenLabsTTSClient {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            let errorBody = String(data: data, encoding: .utf8) ?? "Unknown error"
-            throw NSError(domain: "ElevenLabsTTS", code: httpResponse.statusCode,
-                          userInfo: [NSLocalizedDescriptionKey: "TTS API error (\(httpResponse.statusCode)): \(errorBody)"])
+            // Wrap non-2xx in SparkleProxyError so CompanionManager can
+            // detect a 429 (daily TTS budget exhausted) and degrade to
+            // the system voice instead of speaking the misleading
+            // "trouble connecting" credits-error utterance.
+            throw SparkleProxyError.fromHTTPResponse(
+                endpoint: .tts,
+                statusCode: httpResponse.statusCode,
+                responseBody: data
+            )
         }
 
         try Task.checkCancellation()
