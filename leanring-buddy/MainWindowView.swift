@@ -1390,16 +1390,38 @@ struct MainWindowView: View {
                 .font(.system(size: 11, weight: .bold))
                 .foregroundColor(themePrimary)
                 .tracking(1.2)
-                .padding(.bottom, 16)
+                .padding(.bottom, 20)
 
-            HStack(alignment: .firstTextBaseline, spacing: 12) {
-                Text("\(aiToolsLearnedCount)")
-                    .font(.system(size: 56, weight: .bold))
-                    .foregroundColor(themeOnSurface)
-                    .tracking(-2)
-                Text("AI tools learned")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundColor(themeOnSurfaceVariant)
+            // Two-stat hero: breadth (sessions = topics explored) × depth (unique AI tools touched).
+            // Splitting these honestly reflects that one AI tool can span many sessions, so a
+            // single number can't represent both "how much you've learned" and "how many tools".
+            HStack(alignment: .top, spacing: 0) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(topicsExploredCount)")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundColor(themeOnSurface)
+                        .tracking(-1.5)
+                    Text("Topics explored")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(themeOnSurfaceVariant)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Rectangle()
+                    .fill(themeOutlineVariant.opacity(0.2))
+                    .frame(width: 1, height: 64)
+                    .padding(.horizontal, 24)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(aiToolsTouchedCount)")
+                        .font(.system(size: 48, weight: .bold))
+                        .foregroundColor(themeOnSurface)
+                        .tracking(-1.5)
+                    Text("AI tools touched")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundColor(themeOnSurfaceVariant)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             Spacer()
@@ -1410,16 +1432,6 @@ struct MainWindowView: View {
                 .padding(.bottom, 24)
 
             HStack(spacing: 32) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("SESSIONS")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(neutralGray400)
-                        .tracking(1.5)
-                    Text("\(totalSessionsCount)")
-                        .font(.system(size: 22, weight: .bold))
-                        .foregroundColor(themeOnSurface)
-                }
-
                 VStack(alignment: .leading, spacing: 4) {
                     Text("DURATION")
                         .font(.system(size: 10, weight: .bold))
@@ -2574,7 +2586,12 @@ struct MainWindowView: View {
         ("Perplexity", ["perplexity"]),
     ]
 
-    private var aiToolsLearnedCount: Int {
+    // Counts unique AI tools that have been mentioned across the user's conversations.
+    // Only counts tools we explicitly recognize (see `recognizedAITools` above), so each
+    // distinct tool contributes at most 1 regardless of how many sessions covered it.
+    // Conversations that don't mention any recognized tool intentionally do not count here —
+    // those still get counted in `topicsExploredCount` (one per session).
+    private var aiToolsTouchedCount: Int {
         let conversations = conversationStore.conversations
         if conversations.isEmpty { return 0 }
 
@@ -2585,19 +2602,11 @@ struct MainWindowView: View {
             return "\(conversation.title) \(exchangeText)".lowercased()
         }
 
-        let recognizedToolsMatchedCount = Self.recognizedAITools.filter { tool in
+        return Self.recognizedAITools.filter { tool in
             searchableTextPerConversation.contains { text in
                 tool.keywords.contains { keyword in text.contains(keyword) }
             }
         }.count
-
-        let conversationsWithNoRecognizedToolCount = searchableTextPerConversation.filter { text in
-            !Self.recognizedAITools.contains { tool in
-                tool.keywords.contains { keyword in text.contains(keyword) }
-            }
-        }.count
-
-        return recognizedToolsMatchedCount + conversationsWithNoRecognizedToolCount
     }
 
     private var totalHoursStudyingLabel: String {
@@ -2615,7 +2624,10 @@ struct MainWindowView: View {
         return "\(Int(hours))h"
     }
 
-    private var totalSessionsCount: Int {
+    // One session = one topic explored. This is intentionally a separate stat from
+    // `aiToolsTouchedCount` so a user with 5 Cursor sessions reads as "5 topics explored,
+    // 1 AI tool touched" rather than collapsing both signals into a single misleading number.
+    private var topicsExploredCount: Int {
         conversationStore.conversations.count
     }
 
