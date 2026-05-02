@@ -39,6 +39,11 @@ final class ElevenLabsTTSClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("audio/mpeg", forHTTPHeaderField: "Accept")
+        // Identify this Sparkle install to the Worker proxy. Without this
+        // header the request is rejected with HTTP 401, since the proxy
+        // gates all upstream API calls on a valid Sparkle bearer token.
+        let clientBearerToken = SparkleClientCredentials.shared.currentClientToken
+        request.setValue("Bearer \(clientBearerToken)", forHTTPHeaderField: "Authorization")
 
         let body: [String: Any] = [
             "text": text,

@@ -63,6 +63,15 @@
 ### DesignSystem.swift
 - `DS.Colors.overlayCursorBlue` — Actually orange (`#FF8C33`), used for the sparkle icon; kept the property name for compatibility
 
+### SparkleClientCredentials.swift
+- `SparkleClientCredentials.shared` — singleton accessor for the per-install bearer token
+- `currentClientToken: String` — generates and persists `sparkle_v1_<64hex>` in the Keychain on first call; cached in-process afterwards
+- `loggableTokenSummary: String` — short, log-safe form of the token for diagnostics
+- Used by `ClaudeAPI`, `ElevenLabsTTSClient`, and `AssemblyAIStreamingTranscriptionProvider` to set the `Authorization: Bearer …` header on every Worker request
+
 ### worker/src/index.ts
 - Cloudflare Worker proxy at `https://nativelearn-proxy.danteocualesjr.workers.dev` (worker name unchanged)
 - `ELEVENLABS_VOICE_ID` = `XB0fDUnXU5powFXDhCwa` (Charlotte, female British voice)
+- All routes require a Sparkle bearer token (`sparkle_v1_<64hex>`) — `authenticateSparkleClient` rejects malformed/missing tokens with HTTP 401
+- `applyEndpointRateLimit` enforces per-token daily caps on `/chat`, `/tts`, `/transcribe-token` via `RATE_LIMIT_KV`
+- Web-search-enabled chat requests pass through both the chat cap and a tighter web-search sub-cap (defaults: chat 200/day, tts 1000/day, transcribe 200/day, web-search 20/day)

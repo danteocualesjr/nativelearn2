@@ -62,6 +62,11 @@ final class AssemblyAIStreamingTranscriptionProvider: BuddyTranscriptionProvider
     private func fetchTemporaryToken() async throws -> String {
         var request = URLRequest(url: URL(string: Self.tokenProxyURL)!)
         request.httpMethod = "POST"
+        // Bearer token identifies this Sparkle install to the Worker proxy
+        // so it can rate-limit per install. The Worker rejects requests
+        // without a Sparkle-issued token with HTTP 401.
+        let clientBearerToken = SparkleClientCredentials.shared.currentClientToken
+        request.setValue("Bearer \(clientBearerToken)", forHTTPHeaderField: "Authorization")
 
         let (data, response) = try await URLSession.shared.data(for: request)
 

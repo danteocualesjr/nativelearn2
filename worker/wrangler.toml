@@ -4,9 +4,21 @@ compatibility_date = "2024-01-01"
 
 [vars]
 ELEVENLABS_VOICE_ID = "XB0fDUnXU5powFXDhCwa"
+# Per-install daily caps. Each value is "max calls per Sparkle install per
+# UTC day". CHAT covers both voice exchanges and background metadata calls;
+# TTS covers every audio segment played; TRANSCRIBE covers AssemblyAI
+# session-token requests; WEB_SEARCH is a tighter sub-cap on chat calls
+# that actually use Anthropic's hosted web_search tool.
+CHAT_DAILY_LIMIT = "200"
+TTS_DAILY_LIMIT = "1000"
+TRANSCRIBE_DAILY_LIMIT = "200"
 WEB_SEARCH_DAILY_LIMIT = "20"
 
+# Rate-limit counters live in this KV namespace under per-token, per-day,
+# per-endpoint keys (e.g. `chat:2026-05-02:<sha256(token)>`). The namespace
+# ID below is the same one that previously backed `WEB_SEARCH_RATE_LIMIT_KV`,
+# so existing counters keep working — only the binding name changed in code.
 [[kv_namespaces]]
-binding = "WEB_SEARCH_RATE_LIMIT_KV"
+binding = "RATE_LIMIT_KV"
 id = "ec3fb13d915c42da8c7b379ab4459001"
 preview_id = "d8240c5245a3442da4325cfb999625b8"

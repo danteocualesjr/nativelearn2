@@ -44,6 +44,11 @@ class ClaudeAPI {
         request.httpMethod = "POST"
         request.timeoutInterval = 120
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        // Bearer token identifies this Sparkle install to the Worker proxy
+        // so it can apply per-install daily rate limits and reject anonymous
+        // probes. Generated and persisted by `SparkleClientCredentials`.
+        let clientBearerToken = SparkleClientCredentials.shared.currentClientToken
+        request.setValue("Bearer \(clientBearerToken)", forHTTPHeaderField: "Authorization")
         return request
     }
 

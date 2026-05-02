@@ -57,9 +57,13 @@ The app never calls external APIs directly. All requests go through a Cloudflare
 | `POST /tts` | `api.elevenlabs.io/v1/text-to-speech/{voiceId}` | ElevenLabs TTS audio |
 | `POST /transcribe-token` | `streaming.assemblyai.com/v3/token` | Fetches a short-lived (480s) AssemblyAI websocket token |
 
+**Authentication**: every request must carry a Sparkle bearer token in the `Authorization: Bearer <token>` header. Tokens are generated locally by the desktop app on first launch (`SparkleClientCredentials.swift`) and persisted in the macOS Keychain. The Worker validates the token format (`sparkle_v1_<64 hex chars>`) and rejects malformed/missing tokens with HTTP 401. Tokens are NOT proof of identity — they're a TOFU credential that filters out anonymous probes and gives the Worker a stable per-install handle for rate limiting. Real attestation would require Apple App Attest, which is out of scope.
+
+**Per-install daily rate limits**: each endpoint counts a per-token, per-day, per-endpoint counter in KV (`<endpoint>:<utc-date>:<sha256(token)>`). When the cap is exceeded the Worker returns HTTP 429 with `retry-after` set to seconds-until-tomorrow-UTC. Defaults: `chat` 200/day, `tts` 1000/day, `transcribe` 200/day, `web-search` 20/day (a sub-cap on chat calls that actually use Anthropic's hosted web_search tool). All limits are configurable via env vars.
+
 Worker secrets: `ANTHROPIC_API_KEY`, `ASSEMBLYAI_API_KEY`, `ELEVENLABS_API_KEY`
-Worker vars: `ELEVENLABS_VOICE_ID` (set to `XB0fDUnXU5powFXDhCwa` — Charlotte female voice), `WEB_SEARCH_DAILY_LIMIT` (defaults to 20 per client per UTC day)
-Worker KV bindings: `WEB_SEARCH_RATE_LIMIT_KV` stores hashed per-client daily counters for web-search-enabled requests.
+Worker vars: `ELEVENLABS_VOICE_ID` (set to `XB0fDUnXU5powFXDhCwa` — Charlotte female voice), `CHAT_DAILY_LIMIT`, `TTS_DAILY_LIMIT`, `TRANSCRIBE_DAILY_LIMIT`, `WEB_SEARCH_DAILY_LIMIT` (each defaults are described above)
+Worker KV bindings: `RATE_LIMIT_KV` stores hashed per-token, per-endpoint daily counters. (Renamed from `WEB_SEARCH_RATE_LIMIT_KV` — the same KV namespace ID is reused so existing counters carry over; only the binding name in code changed.)
 
 ### Key Architecture Decisions
 
@@ -108,7 +112,8 @@ Worker KV bindings: `WEB_SEARCH_RATE_LIMIT_KV` stores hashed per-client daily co
 | `VibecademyAnalytics.swift` | ~122 | PostHog analytics integration (`VibecademyAnalytics`) for usage tracking. |
 | `WindowPositionManager.swift` | ~262 | Window placement logic, Screen Recording permission flow, and accessibility permission helpers. |
 | `AppBundleConfiguration.swift` | ~28 | Runtime configuration reader for keys stored in the app bundle Info.plist. |
-| `worker/src/index.ts` | ~290 | Cloudflare Worker proxy. Three routes: `/chat` (Claude), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). The `/chat` route strips web search from non-current prompts and applies KV-backed per-client daily rate limiting before forwarding web-search-enabled requests to Anthropic. |
+| `SparkleClientCredentials.swift` | ~165 | Keychain-backed per-install bearer token (`sparkle_v1_<64 hex chars>`). Generates and persists on first access via `SecRandomCopyBytes` + `SecItemAdd`. Singleton (`SparkleClientCredentials.shared`). Used by `ClaudeAPI`, `ElevenLabsTTSClient`, and `AssemblyAIStreamingTranscriptionProvider` to authenticate every Worker call. The token is cached in-process after first read so we don't hit the Keychain on every API request. |
+| `worker/src/index.ts` | ~510 | Cloudflare Worker proxy. Three routes: `/chat` (Claude), `/tts` (ElevenLabs), `/transcribe-token` (AssemblyAI temp token). All routes require a valid `Authorization: Bearer sparkle_v1_<64hex>` header (validated by `authenticateSparkleClient`). Each route enforces a per-install daily cap via `applyEndpointRateLimit` (counters stored in KV under `<endpoint>:<utc-date>:<sha256(token)>`). The `/chat` route also strips web_search from non-current prompts and applies a tighter sub-cap before forwarding web-search-enabled requests to Anthropic. |
 
 ## Build & Run
 
@@ -137,9 +142,12 @@ npx wrangler secret put ANTHROPIC_API_KEY
 npx wrangler secret put ASSEMBLYAI_API_KEY
 npx wrangler secret put ELEVENLABS_API_KEY
 
-# Add web search rate-limit storage and copy the generated IDs into wrangler.toml
-npx wrangler kv:namespace create WEB_SEARCH_RATE_LIMIT_KV
-npx wrangler kv:namespace create WEB_SEARCH_RATE_LIMIT_KV --preview
+# Add the rate-limit KV namespace and copy the generated IDs into wrangler.toml
+# under `binding = "RATE_LIMIT_KV"`. (If you previously created
+# WEB_SEARCH_RATE_LIMIT_KV, you can keep the same namespace ID and just
+# rename the binding — counters carry over.)
+npx wrangler kv:namespace create RATE_LIMIT_KV
+npx wrangler kv:namespace create RATE_LIMIT_KV --preview
 
 # Deploy
 npx wrangler deploy
