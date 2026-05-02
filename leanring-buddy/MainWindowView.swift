@@ -640,6 +640,70 @@ struct MainWindowView: View {
         return "Off"
     }
 
+    // MARK: - Top App Bar Mic Indicator
+
+    // The mic button in the top app bar used to be a static gray icon, so the
+    // user couldn't tell at a glance whether Sparkle was on or off. These
+    // computed properties drive an icon-swap + color-shift + pulse so the
+    // button visually reflects every meaningful state Sparkle can be in.
+
+    /// Mic icon swaps between filled (on) and slashed (off / error / no
+    /// permissions) so the on-vs-off distinction reads from the silhouette
+    /// alone, not just from color — matters for color-blind users and for
+    /// quick glance-ability.
+    private var topBarMicSystemImageName: String {
+        if companionManager.overlayErrorMessage != nil { return "mic.slash.fill" }
+        if !companionManager.allPermissionsGranted { return "mic.slash.fill" }
+        if !companionManager.isSparkleCursorEnabled { return "mic.slash.fill" }
+        return "mic.fill"
+    }
+
+    private var topBarMicIconColor: Color {
+        if companionManager.overlayErrorMessage != nil { return Color.red.opacity(0.85) }
+        if !companionManager.allPermissionsGranted { return Color.orange.opacity(0.85) }
+        if !companionManager.isSparkleCursorEnabled { return neutralGray500 }
+        switch companionManager.voiceState {
+        case .idle:       return Color.green.opacity(0.85)
+        case .listening:  return Color.green
+        case .processing: return Color.orange
+        case .responding: return themePrimary
+        }
+    }
+
+    /// Soft circular halo behind the mic icon. Only shown when Sparkle is on
+    /// and healthy so the "on" state has visible weight beyond just a color
+    /// tint — and so the "off" state stays as quiet as possible.
+    private var topBarMicShouldShowActiveBackground: Bool {
+        companionManager.isSparkleCursorEnabled
+            && companionManager.allPermissionsGranted
+            && companionManager.overlayErrorMessage == nil
+    }
+
+    /// Drives the breathing-pulse animation. We pulse only during the active
+    /// voice sub-states (listening / processing / responding) so the user
+    /// gets live feedback that voice work is in flight; pulsing when Sparkle
+    /// is merely "on but idle" would be visual noise.
+    private var topBarMicShouldPulse: Bool {
+        guard topBarMicShouldShowActiveBackground else { return false }
+        switch companionManager.voiceState {
+        case .listening, .processing, .responding: return true
+        case .idle: return false
+        }
+    }
+
+    private var topBarMicTooltip: String {
+        if companionManager.overlayErrorMessage != nil {
+            return "Sparkle: error — see overlay for details"
+        }
+        if !companionManager.allPermissionsGranted {
+            return "Sparkle: setup needed — grant permissions to enable"
+        }
+        if !companionManager.isSparkleCursorEnabled {
+            return "Sparkle is off — click to turn on"
+        }
+        return "Sparkle is \(sparkleStatusShortLabel.lowercased()) — click to turn off"
+    }
+
     /// Display name to show in the chrome (welcome header, sidebar chip, row
     /// owner labels). Falls back to the macOS account full name when the user
     /// hasn't filled in their preferred name yet, and to `""` when even that
@@ -1293,6 +1357,10 @@ struct MainWindowView: View {
 
     @State private var selectedTopTab = "Dashboard"
 
+    /// Drives the breathing pulse on the top-bar mic indicator. Animated via
+    /// `withAnimation` in `.onChange(of: topBarMicShouldPulse)` below.
+    @State private var topBarMicPulseOpacity: Double = 1.0
+
     private var topAppBar: some View {
         HStack {
             if isSidebarCollapsed {
@@ -1341,13 +1409,34 @@ struct MainWindowView: View {
                 Button {
                     companionManager.setSparkleCursorEnabled(!companionManager.isSparkleCursorEnabled)
                 } label: {
-                    Image(systemName: "mic")
-                        .font(.system(size: 14))
-                        .foregroundColor(neutralGray500)
+                    ZStack {
+                        if topBarMicShouldShowActiveBackground {
+                            Circle()
+                                .fill(topBarMicIconColor.opacity(0.15))
+                                .frame(width: 26, height: 26)
+                        }
+                        Image(systemName: topBarMicSystemImageName)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundColor(topBarMicIconColor)
+                            .opacity(topBarMicPulseOpacity)
+                    }
+                    .frame(width: 26, height: 26)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .nativeTooltip(companionManager.isSparkleCursorEnabled ? "Sparkle: \(sparkleStatusShortLabel)" : "Toggle Sparkle")
+                .nativeTooltip(topBarMicTooltip)
                 .onHover { h in if h { NSCursor.pointingHand.push() } else { NSCursor.pop() } }
+                .onChange(of: topBarMicShouldPulse) { isPulsing in
+                    if isPulsing {
+                        withAnimation(.easeInOut(duration: 0.7).repeatForever(autoreverses: true)) {
+                            topBarMicPulseOpacity = 0.45
+                        }
+                    } else {
+                        withAnimation(.easeOut(duration: 0.2)) {
+                            topBarMicPulseOpacity = 1.0
+                        }
+                    }
+                }
             }
         }
         .padding(.horizontal, 32)
