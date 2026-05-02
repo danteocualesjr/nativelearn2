@@ -326,4 +326,64 @@ class ClaudeAPI {
         let duration = Date().timeIntervalSince(startTime)
         return (text: text, duration: duration)
     }
+
+    /// Plain text generation — no images, no tools, no streaming. Used for
+    /// background metadata tasks like generating a conversation title and
+    /// summary from past exchanges. Callers can override the model so
+    /// cheap/fast calls (titles, summaries, classifications) can use Haiku
+    /// while the main voice pipeline keeps its own Sonnet/Opus selection.
+    ///
+    /// The proxy worker forwards `model` verbatim, so any Anthropic-supported
+    /// identifier is valid here. `maxTokens` is small by design — these are
+    /// short structured responses, not freeform answers.
+    func generateText(
+        systemPrompt: String,
+        userPrompt: String,
+        modelOverride: String? = nil,
+        maxTokens: Int = 200
+    ) async throws -> String {
+        var request = makeAPIRequest()
+        // Metadata calls should fail fast rather than tie up a slot — the user
+        // never sees these directly, so a stuck request is just wasted work.
+        request.timeoutInterval = 30
+
+        let messages: [[String: Any]] = [
+            ["role": "user", "content": userPrompt]
+        ]
+
+        let body: [String: Any] = [
+            "model": modelOverride ?? model,
+            "max_tokens": maxTokens,
+            "system": systemPrompt,
+            "messages": messages
+        ]
+
+        let bodyData = try JSONSerialization.data(withJSONObject: body)
+        request.httpBody = bodyData
+
+        let (data, response) = try await session.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse,
+              (200...299).contains(httpResponse.statusCode) else {
+            let responseString = String(data: data, encoding: .utf8) ?? "Unknown error"
+            throw NSError(
+                domain: "ClaudeAPI",
+                code: (response as? HTTPURLResponse)?.statusCode ?? -1,
+                userInfo: [NSLocalizedDescriptionKey: "API Error: \(responseString)"]
+            )
+        }
+
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        guard let content = json?["content"] as? [[String: Any]],
+              let textBlock = content.first(where: { ($0["type"] as? String) == "text" }),
+              let text = textBlock["text"] as? String else {
+            throw NSError(
+                domain: "ClaudeAPI",
+                code: -1,
+                userInfo: [NSLocalizedDescriptionKey: "Invalid response format"]
+            )
+        }
+
+        return text
+    }
 }
