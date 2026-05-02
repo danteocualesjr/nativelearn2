@@ -2610,12 +2610,38 @@ struct MainWindowView: View {
     }
 
     private var totalHoursStudyingLabel: String {
-        let totalSeconds = conversationStore.conversations.reduce(0.0) { total, conversation in
-            total + conversation.updatedAt.timeIntervalSince(conversation.createdAt)
+        // We can't naively use `updatedAt - createdAt` per conversation: a conversation
+        // updated days after it was created reports days of "study time" even though
+        // only a few minutes of speaking actually happened (this is what produced the
+        // earlier 411h bug). Instead, estimate active time per conversation by summing
+        // the gaps between consecutive exchange timestamps (capped so a long coffee-break
+        // gap doesn't dominate) plus a small per-exchange baseline that accounts for the
+        // user-speaking-and-Sparkle-replying portion of each turn.
+        let maxConsideredGapBetweenExchangesSeconds: TimeInterval = 300
+        let baselineSecondsPerExchange: TimeInterval = 20
+
+        let totalActiveSeconds = conversationStore.conversations.reduce(0.0) { runningTotal, conversation in
+            let exchanges = conversation.exchanges
+            guard !exchanges.isEmpty else { return runningTotal }
+
+            // Defensive sort — exchanges are appended in order, but sorting makes the
+            // gap math correct even if a future code path ever inserts out of order.
+            let sortedExchangeTimestamps = exchanges.map { $0.timestamp }.sorted()
+
+            var perConversationActiveSeconds: TimeInterval = 0
+            for index in 1..<sortedExchangeTimestamps.count {
+                let gapSinceLastExchange = sortedExchangeTimestamps[index]
+                    .timeIntervalSince(sortedExchangeTimestamps[index - 1])
+                perConversationActiveSeconds += min(gapSinceLastExchange, maxConsideredGapBetweenExchangesSeconds)
+            }
+            perConversationActiveSeconds += Double(exchanges.count) * baselineSecondsPerExchange
+
+            return runningTotal + perConversationActiveSeconds
         }
-        let hours = totalSeconds / 3600.0
+
+        let hours = totalActiveSeconds / 3600.0
         if hours < 0.1 {
-            let minutes = Int(totalSeconds / 60.0)
+            let minutes = Int(totalActiveSeconds / 60.0)
             return "\(minutes)m"
         }
         if hours < 10 {
