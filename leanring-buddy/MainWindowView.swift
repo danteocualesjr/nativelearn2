@@ -808,7 +808,9 @@ struct MainWindowView: View {
                         case "Academy":
                             academyTabContent
                         case "Insights":
-                            InsightsView(conversationStore: conversationStore)
+                            InsightsView(conversationStore: conversationStore) {
+                                selectedTopTab = "Academy"
+                            }
                                 .padding(.top, 32)
                         default:
                             dashboardTabContent(

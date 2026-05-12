@@ -226,20 +226,146 @@ struct InsightsStats {
 
 struct InsightsView: View {
     @ObservedObject var conversationStore: ConversationStore
+    var onBrowseAcademy: () -> Void = {}
     @State private var selectedRange: InsightsStats.Range = .month
 
     private var stats: InsightsStats {
         InsightsStats(conversations: conversationStore.conversations, range: selectedRange)
     }
 
+    private var activeNonArchivedConversations: [Conversation] {
+        conversationStore.conversations.filter { !$0.archived }
+    }
+
+    private var shouldShowFullInsightsEmptyState: Bool {
+        activeNonArchivedConversations.isEmpty
+    }
+
+    private var shouldShowRangeOnlyEmptyBanner: Bool {
+        !activeNonArchivedConversations.isEmpty
+            && stats.totalSessions == 0
+            && (selectedRange == .week || selectedRange == .month)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            headerRow
-            kpiTilesRow
-            activityHeatmapCard
-            breakdownAndStreaksRow
+        Group {
+            if shouldShowFullInsightsEmptyState {
+                insightsFullEmptyLayout
+            } else {
+                VStack(alignment: .leading, spacing: 28) {
+                    headerRow
+                    if shouldShowRangeOnlyEmptyBanner {
+                        insightsRangeEmptyBanner
+                    }
+                    kpiTilesRow
+                    activityHeatmapCard
+                    breakdownAndStreaksRow
+                }
+            }
         }
         .padding(.horizontal, 32)
+    }
+
+    // MARK: - Empty & range-prompt layouts
+
+    private var insightsFullEmptyLayout: some View {
+        VStack(alignment: .leading, spacing: 28) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Insights")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundColor(insightsOnSurface)
+                    .tracking(-0.5)
+                Text("Your stats will appear after you chat with Sparkle.")
+                    .font(.system(size: 13))
+                    .foregroundColor(insightsOnSurfaceVariant)
+            }
+
+            VStack(spacing: 20) {
+                GlassSparkleView(baseColor: insightsPrimary, size: 40, glowRadius: 4, isMuted: true)
+
+                Text("No learning activity yet")
+                    .font(.system(size: 17, weight: .semibold, design: .rounded))
+                    .foregroundColor(insightsOnSurface)
+
+                Text("Voice sessions with Sparkle show up here as sessions, time, streaks, and which AI tools you explore.")
+                    .font(.system(size: 13))
+                    .foregroundColor(insightsNeutralGray500)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Text("Hold  Control + Option  to talk to Sparkle")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundColor(insightsOnSurfaceVariant)
+
+                Button {
+                    onBrowseAcademy()
+                } label: {
+                    Text("Browse Academy")
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 22)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(insightsPrimary))
+                }
+                .buttonStyle(.plain)
+                .onHover { hovering in
+                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
+            .padding(.horizontal, 28)
+            .background(
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(insightsSurfaceLowest)
+                    .shadow(color: insightsOnSurface.opacity(0.06), radius: 12, y: 4)
+            )
+        }
+    }
+
+    private var insightsRangeEmptyBanner: some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: "calendar.badge.clock")
+                .font(.system(size: 18, weight: .medium))
+                .foregroundColor(insightsPrimary.opacity(0.85))
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("No sessions in this period")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(insightsOnSurface)
+                Text("Switch to All time to see your history, or start a new voice session with Sparkle.")
+                    .font(.system(size: 12))
+                    .foregroundColor(insightsNeutralGray500)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
+                    withAnimation(.easeOut(duration: 0.2)) {
+                        selectedRange = .all
+                    }
+                } label: {
+                    Text("Show all time")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(insightsPrimary)
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+                .onHover { hovering in
+                    if hovering { NSCursor.pointingHand.push() } else { NSCursor.pop() }
+                }
+            }
+
+            Spacer(minLength: 0)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(insightsSurfaceContainerLow)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(insightsOutlineVariant.opacity(0.35), lineWidth: 1)
+                )
+        )
     }
 
     // MARK: Header + Range Picker
